@@ -8,14 +8,14 @@ fi
 # ==============================================================================
 # AmneziaWG 2.0 installation and configuration script for Ubuntu/Debian servers
 # Author: @bivlked
-# Version: 5.11.5
-# Date: 2026-05-05
+# Version: 5.12.0
+# Date: 2026-05-06
 # Repository: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 
 # --- Safe mode and Constants ---
 set -o pipefail
-SCRIPT_VERSION="5.11.5"
+SCRIPT_VERSION="5.12.0"
 
 AWG_DIR="/root/awg"
 CONFIG_FILE="$AWG_DIR/awgsetup_cfg.init"
@@ -33,8 +33,8 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Verified in step5_download_scripts() after curl.
 # Verification is skipped when AWG_BRANCH is overridden (test branch).
 # Format: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="117c76e6dab567d5089807e90e1044eb417eb4e81dc6f9c032f279bc793ce516"
-MANAGE_SCRIPT_SHA256="dcb9e39631ed9a6a8064752acafd40e12e913ba7a4ac63da47c0139ccd7dff82"
+COMMON_SCRIPT_SHA256="526367064c7f8cee919b5b407a80d3c8de45d47e04cbed68f0f15ac3f4f78ef5"
+MANAGE_SCRIPT_SHA256="484ad9e266981b52969aac7774f5afacc37c374c590a26ebe6852467415cf470"
 
 # CLI flags
 UNINSTALL=0; HELP=0; DIAGNOSTIC=0; VERBOSE=0; NO_COLOR=0; AUTO_YES=0; NO_TWEAKS=0
@@ -1405,6 +1405,29 @@ step_uninstall() {
     systemctl stop awg-quick@awg0 2>/dev/null
     systemctl disable awg-quick@awg0 2>/dev/null
     modprobe -r amneziawg 2>/dev/null || true
+    # v5.12.0+: kernel module auto-repair on kernel upgrade.
+    # Remove apt hook and systemd unit BEFORE apt purge so the hook does not
+    # fire during amneziawg-dkms purge (the helper would try to rebuild DKMS,
+    # but the package is already gone). Files may be absent on installs from
+    # before v5.12.0 — all operations are idempotent.
+    log "Removing kernel module auto-repair components (v5.12.0+)..."
+    if systemctl is-enabled amneziawg-ensure-module.service &>/dev/null; then
+        systemctl disable amneziawg-ensure-module.service 2>/dev/null || true
+    fi
+    rm -f /etc/systemd/system/amneziawg-ensure-module.service \
+        /etc/apt/apt.conf.d/99-amneziawg-post-kernel \
+        /etc/logrotate.d/amneziawg-ensure-module \
+        /usr/local/sbin/amneziawg-ensure-module \
+        2>/dev/null
+    # Also clean up staging dotfiles that may be left over from an interrupted install (atomic deploy).
+    rm -f /etc/systemd/system/.amneziawg-ensure-module.service.new \
+        /etc/apt/apt.conf.d/.99-amneziawg-post-kernel.new \
+        /etc/logrotate.d/.amneziawg-ensure-module.new \
+        /usr/local/sbin/.amneziawg-ensure-module.new \
+        2>/dev/null || true
+    rm -f /var/log/amneziawg-ensure-module.log* 2>/dev/null || true
+    rm -rf /var/lib/amneziawg 2>/dev/null || true
+    systemctl daemon-reload 2>/dev/null || true
     if [[ "$saved_no_tweaks" -eq 0 ]]; then
         log "Cleaning up AmneziaWG UFW rules..."
         if command -v ufw &>/dev/null; then
@@ -2000,6 +2023,297 @@ PPASRC
         fi
     fi
     install_packages "${packages[@]}"
+
+    # v5.12.0: install a kernel-headers meta-package so apt automatically
+    # pulls matching headers on every kernel upgrade. Without the meta only
+    # linux-headers-$(uname -r) is installed, which does not track new
+    # kernels and the DKMS module fails to rebuild on the next apt upgrade.
+    #
+    # Detect kernel flavor (Ubuntu cloud images: aws/azure/gcp/oracle/kvm/
+    # lowlatency/raspi; Debian cloud-amd64) — a plain linux-headers-generic
+    # on an Azure VM does not track the right kernel pipeline. Take the
+    # uname -r suffix, try the flavor-specific meta first, fall back to
+    # generic / arch.
+    local arch_meta kernel_rel
+    arch_meta="$(dpkg --print-architecture 2>/dev/null || echo '')"
+    kernel_rel="$(uname -r)"
+    local -a meta_candidates=()
+    if [[ "$kernel_rel" == *+rpt* || "$kernel_rel" == *-rpi* ]]; then
+        : # RPi: linux-headers-rpi-{2712,v8} meta is already in packages above.
+    elif [[ "${OS_ID:-ubuntu}" == "ubuntu" ]]; then
+        # Ubuntu uname -r format: 6.8.0-49-generic / 6.8.0-1009-aws / ...
+        local flavor="${kernel_rel##*-}"
+        if [[ -n "$flavor" && "$flavor" != "$kernel_rel" ]]; then
+            meta_candidates+=("linux-headers-${flavor}")
+        fi
+        meta_candidates+=("linux-headers-generic")
+    elif [[ "${OS_ID:-}" == "debian" && -n "$arch_meta" ]]; then
+        # Debian: stock kernel 6.12.85+deb13-amd64, cloud — 6.12.85+deb13-cloud-amd64.
+        [[ "$kernel_rel" == *-cloud-* ]] \
+            && meta_candidates+=("linux-headers-cloud-${arch_meta}")
+        meta_candidates+=("linux-headers-${arch_meta}")
+    fi
+    local meta meta_installed=0
+    for meta in "${meta_candidates[@]}"; do
+        if dpkg-query -W -f='${Status}' "$meta" 2>/dev/null \
+                | grep -q 'install ok installed'; then
+            log "$meta is already installed (auto-tracking kernel upgrades)."
+            meta_installed=1
+            break
+        fi
+        log "Installing meta-package $meta..."
+        if DEBIAN_FRONTEND=noninteractive apt install -y "$meta" 2>/dev/null; then
+            log "$meta installed."
+            meta_installed=1
+            break
+        fi
+        log_warn "Failed to install $meta — trying next candidate."
+    done
+    if [[ ${#meta_candidates[@]} -gt 0 && $meta_installed -eq 0 ]]; then
+        log_warn "No kernel-headers meta-package installed — auto-rebuild on kernel upgrade may not work."
+    fi
+
+    # v5.12.0: deploy the standalone helper /usr/local/sbin/amneziawg-ensure-module.
+    # It is invoked from the apt hook (DPkg::Post-Invoke) and from the Phase 4
+    # systemd unit. The helper is self-contained — it does NOT source
+    # awg_common.sh — so it keeps working even if /root/awg/ is moved.
+    #
+    # Deploy uses a staging file in the SAME filesystem as the destination
+    # plus a final `mv -f` — guaranteeing atomic replacement (a cross-FS
+    # rename is copy+remove, NOT atomic). The staging file starts with a
+    # dot so apt and logrotate skip dotfiles when scanning the directory.
+    log "Deploying DKMS auto-repair helper..."
+    mkdir -p /usr/local/sbin
+    local _stage_helper=/usr/local/sbin/.amneziawg-ensure-module.new
+    cat > "$_stage_helper" <<'AWG_ENSURE_HELPER_EOF'
+#!/bin/bash
+# amneziawg-ensure-module — rebuilds the AmneziaWG DKMS module after a
+# kernel upgrade.
+#
+# Generated by install_amneziawg.sh (v5.12.0+). Do not edit; re-run the
+# installer to refresh.
+#
+# Modes:
+#   --hook     — invoked from /etc/apt/apt.conf.d/99-amneziawg-post-kernel
+#                (DPkg::Post-Invoke). Constraints:
+#                  - MUST NOT call apt-get install: the parent apt still
+#                    holds /var/lib/dpkg/lock-frontend, a nested install
+#                    would deadlock.
+#                  - Skips modprobe and systemctl: the running kernel may
+#                    still be the old one. The newly-built module is
+#                    loaded after reboot via the systemd unit, or via
+#                    `manage repair-module`.
+#                Stamp-file fast-path keeps routine apt ops noise-free.
+#
+#   --systemd  — invoked from amneziawg-ensure-module.service at boot,
+#                ordered Before=awg-quick@awg0.service. Builds for every
+#                target kernel (same as --hook), then loads the module
+#                via modprobe so awg-quick can start. No stamp fast-path
+#                — boot must always verify load state, even if /lib/modules
+#                hasn't changed since the last build (module not loaded
+#                across reboots). Exit 1 if modprobe fails so systemd
+#                marks the unit as failed (visible via systemctl status).
+#
+# Iteration target: every kernel that exposes /lib/modules/<ver>/build
+# (= a directory with installed headers). uname -r alone is insufficient
+# in apt-hook context because it returns the OLD running kernel while
+# the new kernel's headers are already on disk.
+#
+# Output: stdout / stderr; --hook appends to
+# /var/log/amneziawg-ensure-module.log (rotated weekly via
+# /etc/logrotate.d/amneziawg-ensure-module). --systemd writes to journal
+# (StandardOutput=journal, StandardError=journal in the unit file).
+
+set -euo pipefail
+
+MODE="${1:-}"
+case "$MODE" in
+    --hook|--systemd) ;;
+    --help|-h) echo "Usage: $0 --hook | --systemd"; exit 0 ;;
+    *) echo "amneziawg-ensure-module: missing or unknown mode (use --hook or --systemd)" >&2; exit 2 ;;
+esac
+
+ts() { date '+%Y-%m-%d %H:%M:%S'; }
+log_line() { printf '[%s] [%s] %s\n' "$(ts)" "$MODE" "$*"; }
+
+if [[ $(id -u) -ne 0 ]]; then
+    log_line "ERROR: root privileges required" >&2
+    exit 1
+fi
+
+if ! command -v dkms >/dev/null 2>&1; then
+    log_line "WARN: dkms is not installed — nothing to do"
+    exit 0
+fi
+
+declare -a target_kernels=()
+shopt -s nullglob
+for build_dir in /lib/modules/*/build; do
+    [[ -d "$build_dir" || -L "$build_dir" ]] || continue
+    target_kernels+=("$(basename "$(dirname "$build_dir")")")
+done
+shopt -u nullglob
+
+if [[ ${#target_kernels[@]} -eq 0 ]]; then
+    log_line "WARN: no /lib/modules/*/build directories — kernel headers missing"
+    exit 0
+fi
+
+# Build per-run state signature (mtime + kver) used by both modes:
+#   --hook     — for stamp-file fast-path comparison (silent exit if equal)
+#   --systemd  — recorded after success so subsequent --hook calls can skip
+STAMP_DIR=/var/lib/amneziawg
+STAMP_FILE="${STAMP_DIR}/ensure-module.stamp"
+current_state=""
+for kver in "${target_kernels[@]}"; do
+    # stat may fail (build dir removed in flight) — guard against set -e abort.
+    # Empty mtime → comparison differs → we re-run dkms autoinstall (acceptable).
+    mtime="$(stat -c '%Y' "/lib/modules/${kver}/build" 2>/dev/null || true)"
+    current_state+="${mtime} ${kver} "
+done
+
+# Fast-path applies ONLY to --hook. Boot (--systemd) must always run the
+# full path — module is not loaded across reboots even when /lib/modules
+# state is unchanged.
+if [[ "$MODE" == "--hook" ]] \
+        && [[ -f "$STAMP_FILE" && "$(cat "$STAMP_FILE" 2>/dev/null)" == "$current_state" ]]; then
+    # Silent exit — routine apt ops don't add log noise.
+    exit 0
+fi
+
+# Strip the deprecated REMAKE_INITRD directive (triggers noisy warnings
+# on modern DKMS releases).
+for cfg in /var/lib/dkms/amneziawg/*/source/dkms.conf; do
+    [[ -f "$cfg" ]] && sed -i '/^REMAKE_INITRD=/d' "$cfg" 2>/dev/null || true
+done
+
+build_rc=0
+for kver in "${target_kernels[@]}"; do
+    log_line "dkms autoinstall -k $kver"
+    if ! dkms autoinstall -k "$kver"; then
+        log_line "WARN: dkms autoinstall failed for kernel $kver" >&2
+        build_rc=1
+    fi
+done
+
+depmod -a 2>/dev/null || true
+
+# --systemd: load the module so awg-quick can start. Exit 1 on modprobe
+# failure — systemd marks the unit failed; visible via `systemctl status
+# amneziawg-ensure-module.service`. awg-quick still starts (Before= is
+# ordering only, not a dependency) and surfaces its own error if the
+# module is unavailable.
+if [[ "$MODE" == "--systemd" ]]; then
+    log_line "modprobe amneziawg"
+    if ! modprobe amneziawg 2>&1; then
+        log_line "ERROR: modprobe amneziawg failed for running kernel $(uname -r)" >&2
+        log_line "  Check: /var/lib/dkms/amneziawg/<ver>/<kernel>/log/make.log" >&2
+        exit 1
+    fi
+    if ! lsmod 2>/dev/null | grep -q '^amneziawg '; then
+        log_line "ERROR: amneziawg module not present in lsmod after modprobe" >&2
+        exit 1
+    fi
+    log_line "amneziawg module loaded for $(uname -r)"
+    # Update stamp on --systemd success (current kernel is usable, what matters
+    # for boot) even if some other kernel's build failed (build_rc=1).
+    mkdir -p "$STAMP_DIR" 2>/dev/null || true
+    printf '%s' "$current_state" > "$STAMP_FILE" 2>/dev/null || true
+    log_line "done"
+    exit 0
+fi
+
+# --hook: update stamp only on full success — partial failures retry next run.
+if [[ $build_rc -eq 0 ]]; then
+    mkdir -p "$STAMP_DIR" 2>/dev/null || true
+    printf '%s' "$current_state" > "$STAMP_FILE" 2>/dev/null || true
+fi
+
+log_line "done (rc=$build_rc)"
+exit "$build_rc"
+AWG_ENSURE_HELPER_EOF
+    chown root:root "$_stage_helper" 2>/dev/null || true
+    chmod 0755 "$_stage_helper" \
+        || { rm -f "$_stage_helper"; die "Failed to chmod helper."; }
+    mv -f "$_stage_helper" /usr/local/sbin/amneziawg-ensure-module \
+        || { rm -f "$_stage_helper"; die "Failed to deploy amneziawg-ensure-module helper."; }
+    log "Helper /usr/local/sbin/amneziawg-ensure-module deployed."
+
+    # v5.12.0: apt hook DPkg::Post-Invoke calls the helper after a kernel upgrade.
+    mkdir -p /etc/apt/apt.conf.d
+    local _stage_hook=/etc/apt/apt.conf.d/.99-amneziawg-post-kernel.new
+    cat > "$_stage_hook" <<'AWG_APT_HOOK_EOF'
+// amneziawg-installer (v5.12.0+): rebuild DKMS module after kernel upgrades.
+// Generated by install_amneziawg.sh — do not edit; re-run the installer to refresh.
+DPkg::Post-Invoke {"if [ -x /usr/local/sbin/amneziawg-ensure-module ]; then /usr/local/sbin/amneziawg-ensure-module --hook >>/var/log/amneziawg-ensure-module.log 2>&1 || true; fi";};
+AWG_APT_HOOK_EOF
+    chown root:root "$_stage_hook" 2>/dev/null || true
+    chmod 0644 "$_stage_hook" \
+        || { rm -f "$_stage_hook"; die "Failed to chmod apt hook."; }
+    mv -f "$_stage_hook" /etc/apt/apt.conf.d/99-amneziawg-post-kernel \
+        || { rm -f "$_stage_hook"; die "Failed to deploy apt hook."; }
+    log "Apt hook 99-amneziawg-post-kernel installed (auto-rebuild on apt kernel upgrade)."
+
+    # v5.12.0: logrotate config for /var/log/amneziawg-ensure-module.log
+    mkdir -p /etc/logrotate.d
+    local _stage_logrotate=/etc/logrotate.d/.amneziawg-ensure-module.new
+    cat > "$_stage_logrotate" <<'AWG_LOGROTATE_EOF'
+/var/log/amneziawg-ensure-module.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+AWG_LOGROTATE_EOF
+    chown root:root "$_stage_logrotate" 2>/dev/null || true
+    chmod 0644 "$_stage_logrotate" \
+        || { rm -f "$_stage_logrotate"; die "Failed to chmod logrotate config."; }
+    mv -f "$_stage_logrotate" /etc/logrotate.d/amneziawg-ensure-module \
+        || { rm -f "$_stage_logrotate"; die "Failed to deploy logrotate config."; }
+    log "Logrotate config /etc/logrotate.d/amneziawg-ensure-module installed (weekly, rotate 4)."
+
+    # v5.12.0 Phase 4: systemd unit guarantees the kernel module is built
+    # and loaded BEFORE awg-quick@awg0 starts on every boot. Type=oneshot +
+    # RemainAfterExit=yes + Before=awg-quick@awg0.service — the standard
+    # pre-load pattern (after a kernel upgrade DKMS may need to rebuild on
+    # the very first boot of the new kernel).
+    log "Deploying systemd unit amneziawg-ensure-module.service..."
+    mkdir -p /etc/systemd/system
+    local _stage_unit=/etc/systemd/system/.amneziawg-ensure-module.service.new
+    cat > "$_stage_unit" <<'AWG_SYSTEMD_UNIT_EOF'
+[Unit]
+Description=Ensure amneziawg kernel module is built and loaded
+Documentation=https://github.com/bivlked/amneziawg-installer
+Before=awg-quick@awg0.service
+After=systemd-modules-load.service local-fs.target
+ConditionPathExists=/usr/local/sbin/amneziawg-ensure-module
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/amneziawg-ensure-module --systemd
+TimeoutStartSec=300
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+AWG_SYSTEMD_UNIT_EOF
+    chown root:root "$_stage_unit" 2>/dev/null || true
+    chmod 0644 "$_stage_unit" \
+        || { rm -f "$_stage_unit"; die "Failed to chmod systemd unit."; }
+    mv -f "$_stage_unit" /etc/systemd/system/amneziawg-ensure-module.service \
+        || { rm -f "$_stage_unit"; die "Failed to deploy systemd unit."; }
+    if ! systemctl daemon-reload; then
+        log_warn "systemctl daemon-reload failed — the unit may not activate until reboot."
+    fi
+    if ! systemctl enable amneziawg-ensure-module.service; then
+        log_warn "Failed to enable amneziawg-ensure-module.service — boot-time auto-rebuild will not run."
+    fi
+    log "Systemd unit amneziawg-ensure-module.service installed and enabled (Before=awg-quick@awg0)."
 
     # DKMS status
     log "Checking DKMS status..."
