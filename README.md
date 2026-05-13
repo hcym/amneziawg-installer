@@ -33,6 +33,7 @@
   <a href="#zachem">Зачем это нужно</a> •
   <a href="#sravnenie">AWG vs WG</a> •
   <a href="#cli-vs-panel">CLI vs панели</a> •
+  <a href="#similar-tools">Похожие инструменты</a> •
   <a href="#quickstart">Быстрый старт</a> •
   <a href="#vozmozhnosti">Что умеет</a> •
   <a href="#operatory">Операторы</a> •
@@ -96,8 +97,26 @@
 
 ---
 
+<a id="similar-tools"></a>
+## 🔧 Сравнение с похожими инструментами
+
+Есть ещё несколько способов поднять AmneziaWG. Каждый выбирает свой компромисс:
+
+| Инструмент | Способ | Кому подходит |
+|---|---|---|
+| **Этот установщик** | SSH + одна bash-команда | Headless VPS, single-purpose сервер, без Docker, ARM-prebuilt'ы |
+| **[wg-easy](https://github.com/wg-easy/wg-easy)** | Docker + веб-интерфейс | Домашние боксы, на которых уже крутится Docker; нужна панель для клиентов |
+| **[spcfox/amnezia-wg-easy](https://github.com/spcfox/amnezia-wg-easy)** | Docker-форк wg-easy | Те, кто уже на wg-easy и хочет именно AmneziaWG вместо обычного WireGuard |
+| **[Amnezia VPN](https://amnezia.org/)** | Десктоп-клиент + SSH deploy | Установка кликами без терминала; нужен графический клиент |
+
+Этот скрипт - путь без панели через SSH: минимальный footprint, kernel-level AmneziaWG, ARM-prebuilt'ы для дешёвых боксов. Если у вас уже стоит Docker и хочется веб-панель управления клиентами - удобнее **wg-easy**. Если нужна установка кликами - десктоп-клиент **Amnezia VPN** имеет свой SSH-deploy.
+
+---
+
 <a id="quickstart"></a>
 ## 🚀 Быстрый старт
+
+> 📘 **Полный гайд по развёртыванию (EN):** [Install AmneziaWG VPN server on Ubuntu/Debian VPS](INSTALL_VPS.md) - выбор VPS, ARM, troubleshooting, удаление.
 
 ```bash
 wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.13.0/install_amneziawg.sh

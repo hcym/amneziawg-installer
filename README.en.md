@@ -33,6 +33,7 @@
   <a href="#why">Why this project</a> •
   <a href="#comparison">AWG vs WG</a> •
   <a href="#cli-vs-panel">CLI vs panels</a> •
+  <a href="#similar-tools">Similar tools</a> •
   <a href="#quickstart">Quick Start</a> •
   <a href="#features">Features</a> •
   <a href="#carriers">Carriers</a> •
@@ -96,8 +97,26 @@ Works on Ubuntu 24.04/25.10 and Debian 12/13. Any cheap VPS with 1 GB RAM is eno
 
 ---
 
+<a id="similar-tools"></a>
+## 🔧 Comparison with similar tools
+
+There are a few other ways to get AmneziaWG running. Each picks a different trade-off:
+
+| Tool | Path | Best for |
+|---|---|---|
+| **This installer** | SSH + one bash command | Headless VPS, single-purpose box, no Docker, ARM prebuilts |
+| **[wg-easy](https://github.com/wg-easy/wg-easy)** | Docker + web UI | Home-lab boxes that already run Docker; want a browser panel for peers |
+| **[spcfox/amnezia-wg-easy](https://github.com/spcfox/amnezia-wg-easy)** | Docker fork of wg-easy | Existing wg-easy users who specifically want AmneziaWG instead of plain WireGuard |
+| **[Amnezia VPN app](https://amnezia.org/)** | Desktop GUI + SSH deploy | Click-through setup with no terminal; prefer a graphical client |
+
+This installer is the headless SSH path: minimum footprint, no web panel, kernel-level AmneziaWG, ARM prebuilts for cheap boxes. If you already run Docker and want a browser-based peer manager, **wg-easy** is the more natural fit. If you want point-and-click deployment, the **Amnezia VPN** desktop client includes its own SSH deployment workflow.
+
+---
+
 <a id="quickstart"></a>
 ## 🚀 Quick Start
+
+> 📘 **Full deployment guide:** [Install AmneziaWG VPN server on Ubuntu/Debian VPS](INSTALL_VPS.md) - covers VPS choice, ARM, troubleshooting, and uninstall.
 
 ```bash
 wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.13.0/install_amneziawg_en.sh
