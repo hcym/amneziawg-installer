@@ -563,12 +563,24 @@ sudo bash /root/awg/manage_amneziawg.sh restart              # Перезапу�
 <details>
 <summary><strong>📰 Упоминания</strong></summary>
 
-- [VPN Статус — каталог AmneziaWG-сервисов и серверных решений](https://vpnstatus.site/protocols/amneziawg)
+**📖 Гайды и туториалы**
+- [Hetzner Community - Making a website accessible from restricted regions](https://community.hetzner.com/tutorials/making-website-accessible-from-restricted-regions) (cross-link в Resources)
+- [Debian Forums — HowTo: Install AmneziaWG 2.0 on Debian 12/13](https://forums.debian.net/viewtopic.php?t=166105)
+- [LowEndTalk - [Tutorial] One-command AmneziaWG VPN server install on Ubuntu / Debian / ARM](https://lowendtalk.com/discussion/217191)
+
+**📰 Статьи и обзоры**
 - [XDA Developers — «I found a self-hosted VPN that works where WireGuard gets blocked»](https://www.xda-developers.com/self-hosted-vpn-works-where-wireguard-gets-blocked/)
 - [Pinggy — Top 5 Best Self-Hosted VPNs in 2026](https://pinggy.io/blog/top_5_best_self_hosted_vpns/)
 - [gHacks Tech News — AmneziaWG 2.0](https://www.ghacks.net/2026/03/25/amnezia-releases-amneziawg-2-0-to-bypass-advanced-internet-censorship-systems/)
-- [Debian Forums — HowTo: Install AmneziaWG 2.0 on Debian 12/13](https://forums.debian.net/viewtopic.php?t=166105)
+
+**📋 Каталоги и подборки**
+- [VPN Статус — каталог AmneziaWG-сервисов и серверных решений](https://vpnstatus.site/protocols/amneziawg)
+- [AlternativeTo - amneziawg-installer (42 альтернативы)](https://alternativeto.net/software/amneziawg-installer/about/)
+- [LibHunt - #1 в категории Shell VPN](https://www.libhunt.com/r/amneziawg-installer)
+
+**💬 Форумы и сообщества**
 - [Qubes OS Forum — AmneziaWG for censored regions](https://forum.qubes-os.org/t/installation-of-amnezia-vpn-and-amnezia-wg-effective-tools-against-internet-blocks-via-dpi-for-china-russia-belarus-turkmenistan-iran-vpn-with-vless-xray-reality-best-obfuscation-for-wireguard-easy-self-hosted-vpn-bypass/39005)
+- [Lemmy.world /c/selfhosted - amneziawg-installer announce (143 upvotes / 39 comments)](https://lemmy.world/post/45242153)
 
 </details>
 
