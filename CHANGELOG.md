@@ -14,6 +14,38 @@
 
 ---
 
+## [5.14.0] - 2026-05-19
+
+**v5.14.0** - небольшой feature-релиз: более надёжное определение публичного IP сервера (дополнительные fallback-сервисы для AWS / NAT облаков) плюс новая подкоманда `manage diagnose` для self-troubleshooting сервера в одну строку. Обратно-совместимо со всеми установками v5.13.x; архитектурных изменений нет. Поддержка ОС без изменений: Ubuntu 24.04 / 25.10 / 26.04, Debian 12 / 13, x86_64 + ARM (Raspberry Pi, Oracle Ampere, Hetzner CAX).
+
+### Главное
+
+- 🌐 **Расширенное определение публичного IP** в `awg_common.sh:get_server_public_ip`. Цепочка fallback выросла с 4 до 6 сервисов - `api.ipify.org`, `checkip.amazonaws.com`, `icanhazip.com`, `ifconfig.io`, `ifconfig.me`, `ipinfo.io/ip` (алфавитный порядок, детерминирован для diff'ов и тестов). `checkip.amazonaws.com` доступен из private subnet AWS / GCP / OCI за NAT Gateway, где `ifconfig.me` может rate-limit'ить; `ifconfig.io` - резерв на случай downtime `ifconfig.me`. Поведение first-wins сохранено: первый валидный IPv4 от любого сервиса используется, остальные не запрашиваются. Успешное определение теперь трассируется в `/root/awg/install_amneziawg.log` (либо в manage log) - пишется напрямую в файл, никогда в stdout, чтобы не сломать контракт `$()` capture и не закорраптить `Endpoint =` строку в клиентских конфигах.
+- 🩺 **`manage diagnose [--carrier=ИМЯ]`** - новая подкоманда для server self-troubleshooting в одну строку. Без аргументов запускает 6 проверок (загрузка kernel module, активность сервиса, UP интерфейса, sysctl `ip_forward`, BBR, UFW + AWG-порт + количество peer'ов). С `--carrier=ИМЯ` дополнительно сравнивает текущие AWG 2.0 параметры обфускации (Jc / Jmin / Jmax / I1) с профилем оператора и печатает OK/WARN/FAIL по каждой проверке + Fix: подсказку. Семь подтверждённых операторов из таблицы `ADVANCED.md`: `beeline_msk` (default preset); `yota_msk`, `tele2_msk`, `tattelecom` (mobile preset, random I1); `tele2_krasnoyarsk`, `megafon_regions` (mobile preset, I1 должен отсутствовать); `tmobile_us` (binary I1, из Discussion #45). Exit-код 1 только при FAIL или неизвестном операторе; WARN не меняет rc. Bilingual RU + EN.
+- 🔒 **Дизайн подписания релизов** ([docs/SIGNING_DESIGN.md](docs/SIGNING_DESIGN.md), пока planning). Threat model, выбор инструмента (minisign против cosign / GPG), signing flow с trusted-comment привязкой подписи к тегу + имени файла для защиты от rollback, draft `release-sign.yml` workflow для загрузки заранее сгенерированных `.minisig`-файлов. Активация gated на генерации maintainer'ом offline-keypair'а и публикации `KEYS.txt` в корне репозитория; до этого секция в `SECURITY.md` описывает только планируемый путь.
+
+### Тесты
+
+**+37 новых bats** (492 в матрице, было 455 на v5.13.0):
+
+- `test_v5140_public_ip_services.bats` (+11) - структурный RU/EN parity на 6 endpoint'ах, byte-identical список сервисов между RU и EN, проверка алфавитного порядка (первый = `api.ipify.org`, последний = `ipinfo.io/ip`), функциональные тесты fallthrough (первый сервис ОК / первый fail-второй ОК / все 6 fail / невалидный IP-формат → skip / last-in-list ОК / cache short-circuit).
+- `test_v5140_diagnose.bats` (+16) - структурный RU/EN parity на `diagnose_server` и helpers `_diagnose_carrier_known`, `_diagnose_carrier_list`, `_diag_line`; CLI парсер принимает `--carrier=ИМЯ`; dispatcher подключает `diagnose`; usage help упоминает diagnose; функциональные проверки carrier map (`beeline_msk` row соответствует default-preset shape, `tele2_krasnoyarsk` имеет `i1=absent`, `tmobile_us` имеет `i1=binary` + Jc=6; unknown carrier возвращает 1); список операторов содержит 7 уникальных подтверждённых; ранее присутствовавшие unconfirmed `mts_msk` + `megafon_msk` намеренно удалены.
+
+### Совместимость
+
+- **ОС**: Ubuntu 24.04 LTS, 25.10, 26.04 (с noble fallback). Debian 12 (bookworm), 13 (trixie).
+- **Архитектура**: amd64, arm64 (Raspberry Pi 4/5, Oracle Cloud Ampere, Hetzner CAX, AWS Graviton, прочие ARM-VPS).
+- **Российские операторы**: matrix в `ADVANCED.md`. Новая команда `diagnose --carrier=ИМЯ` распознаёт 7 подтверждённых строк; "🔄 тестируется" строки (Megafon Москва, МТС Москва) намеренно исключены до фиксации диапазона.
+
+### Вне этого релиза
+
+- v5.14.1+: мелкие cleanups по post-release фидбеку.
+- v5.15.x: активация minisign-подписей (после генерации maintainer keypair), per-client CPS profiles (Issue #71), `--preset=mobile-awg1` для операторов с I1=none.
+
+[Полный diff против v5.13.0](https://github.com/bivlked/amneziawg-installer/compare/v5.13.0...v5.14.0)
+
+---
+
 ## [5.13.0] — 2026-05-12
 
 **v5.13.0** — релиз AmneziaWG 2.0 VPN-инсталлятора с поддержкой Ubuntu 25.10 (questing) и 26.04, и защитным флагом `--force` против случайной переустановки на работающем сервере. Поддержка Ubuntu 24.04, Debian 12 / 13, x86_64 + ARM (Raspberry Pi, Oracle Ampere, Hetzner CAX) — без изменений.

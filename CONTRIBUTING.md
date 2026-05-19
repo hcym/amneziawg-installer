@@ -52,7 +52,7 @@ Before submitting a PR, ensure:
    done
    ```
 
-3. **Unit tests (bats-core)** pass. Current expected baseline on `v5.13.0`: **455 tests**.
+3. **Unit tests (bats-core)** pass. Current expected baseline on `v5.14.0`: **492 tests** (added in v5.14.0: extended public IP detection coverage + `manage diagnose --carrier=N` coverage).
    ```bash
    bats tests/
    ```

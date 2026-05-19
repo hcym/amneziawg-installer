@@ -41,7 +41,7 @@ sudo ufw allow <your-ssh-port>/tcp
 Then:
 
 ```bash
-wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.13.0/install_amneziawg_en.sh
+wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.14.0/install_amneziawg_en.sh
 chmod +x install_amneziawg_en.sh
 sudo bash ./install_amneziawg_en.sh
 ```
@@ -76,7 +76,7 @@ Verify the handshake from the server side with `sudo awg show awg0` after the cl
 
 ## Update flow
 
-Updating to a newer installer release on a server that already has v5.13.0 running:
+Updating to a newer installer release on a server that already has v5.13.x or v5.14.x running:
 
 ```bash
 wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/vX.Y.Z/install_amneziawg_en.sh

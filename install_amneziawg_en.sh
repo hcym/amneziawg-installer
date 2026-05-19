@@ -15,7 +15,7 @@ fi
 
 # --- Safe mode and Constants ---
 set -o pipefail
-SCRIPT_VERSION="5.13.0"
+SCRIPT_VERSION="5.14.0"
 
 AWG_DIR="/root/awg"
 CONFIG_FILE="$AWG_DIR/awgsetup_cfg.init"
@@ -33,8 +33,8 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Verified in step5_download_scripts() after curl.
 # Verification is skipped when AWG_BRANCH is overridden (test branch).
 # Format: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="a788844e9097b373ed5a8cf1ea0e00965a8ccd1e187b607809a2dfe550ae1e62"
-MANAGE_SCRIPT_SHA256="e030938342a6f2a26ca2060712ba13f23b84579346b410aa1c9641dedc010124"
+COMMON_SCRIPT_SHA256="23c54db648aab7ecc8a96430eeec1956f7298697974d7deb2addaffd73327de8"
+MANAGE_SCRIPT_SHA256="e4056af41f5b7754975f9d1a1ec16be6585d3f7d1938a47ea8d262bd44c604a0"
 
 # CLI flags
 UNINSTALL=0; HELP=0; DIAGNOSTIC=0; VERBOSE=0; NO_COLOR=0; AUTO_YES=0; NO_TWEAKS=0

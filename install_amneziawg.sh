@@ -16,7 +16,7 @@ fi
 # --- Безопасный режим и Константы ---
 set -o pipefail
 
-SCRIPT_VERSION="5.13.0"
+SCRIPT_VERSION="5.14.0"
 AWG_DIR="/root/awg"
 CONFIG_FILE="$AWG_DIR/awgsetup_cfg.init"
 STATE_FILE="$AWG_DIR/setup_state"
@@ -33,8 +33,8 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Проверяются в step5_download_scripts() после curl.
 # Если AWG_BRANCH переопределён (не v$SCRIPT_VERSION), проверка пропускается.
 # Формат: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="2f75bb5c827f7e3d36ecbb716b0b89096591694c1a636c31c784683738140eb9"
-MANAGE_SCRIPT_SHA256="291c83acb0449aa7e6b1780b06b2eb4f342b47a01cad1b2e2a6e6f980ab3f09e"
+COMMON_SCRIPT_SHA256="82c9e685fd03833f1248b8a8ca5da8efb9cdb5761704e400a1b8c4933d00b7dd"
+MANAGE_SCRIPT_SHA256="35d62530e7b4ab8caf7ebf966ee6cde2b81d4c59dfeccd6684fae389e9ffe73e"
 
 # Флаги CLI
 UNINSTALL=0; HELP=0; DIAGNOSTIC=0; VERBOSE=0; NO_COLOR=0; AUTO_YES=0; NO_TWEAKS=0

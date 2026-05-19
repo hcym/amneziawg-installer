@@ -14,6 +14,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [5.14.0] - 2026-05-19
+
+**v5.14.0** - small feature release: more reliable public IP detection (extra fallback services for AWS / NAT'd cloud) plus a new `manage diagnose` subcommand for one-line self-troubleshooting. Backwards-compatible with v5.13.x installs; no architectural changes. Support matrix unchanged: Ubuntu 24.04 / 25.10 / 26.04, Debian 12 / 13, x86_64 + ARM (Raspberry Pi, Oracle Ampere, Hetzner CAX).
+
+### Highlights
+
+- 🌐 **Extended public IP detection** in `awg_common.sh:get_server_public_ip`. The fallback cascade grew from 4 to 6 services - `api.ipify.org`, `checkip.amazonaws.com`, `icanhazip.com`, `ifconfig.io`, `ifconfig.me`, `ipinfo.io/ip` (alphabetical order, deterministic for diffs and tests). `checkip.amazonaws.com` is reachable from AWS / GCP / OCI private subnets behind a NAT Gateway where `ifconfig.me` can rate-limit; `ifconfig.io` is a backup for `ifconfig.me` downtime. First-wins behaviour preserved: when a service returns a valid IPv4, the rest are skipped. Successful detection is now traced into `/root/awg/install_amneziawg.log` (or the manage log file) - written directly to file, never to stdout, so the function's `$()` capture contract is preserved and the generated client `Endpoint =` line is not corrupted.
+- 🩺 **`manage diagnose [--carrier=NAME]`** - new subcommand for one-line server self-troubleshooting. Without arguments it runs 6 health checks (kernel module loaded / service active / interface UP / sysctl ip_forward / BBR / UFW + AWG port + peer count). With `--carrier=NAME` it additionally compares the current AWG 2.0 obfuscation parameters (Jc / Jmin / Jmax / I1) against a known carrier profile and prints OK/WARN/FAIL per check with a Fix: hint. Seven confirmed carriers from `ADVANCED.en.md` operator matrix: `beeline_msk` (default preset); `yota_msk`, `tele2_msk`, `tattelecom` (mobile preset, random I1); `tele2_krasnoyarsk`, `megafon_regions` (mobile preset, I1 must be absent); `tmobile_us` (binary I1, from Discussion #45). Exit code 1 only on FAIL or unknown carrier; WARN does not change the rc. Bilingual RU + EN.
+- 🔒 **Release signing design** ([docs/SIGNING_DESIGN.md](docs/SIGNING_DESIGN.md), planning only). Threat model, tool choice (minisign over cosign / GPG), signing flow with trusted-comment binding to tag + filename for rollback protection, and a draft `release-sign.yml` workflow that uploads pre-generated `.minisig` files. Activation is gated on the maintainer generating an offline keypair and committing `KEYS.txt` to the repository root; until then the section in `SECURITY.md` describes the planned path.
+
+### Tests
+
+**+37 new bats** (492 in the matrix, was 455 on v5.13.0):
+
+- `test_v5140_public_ip_services.bats` (+11) - structural RU/EN parity on the 6 endpoints, byte-identical service list across RU and EN, alphabetical-order assertions (first = `api.ipify.org`, last = `ipinfo.io/ip`), functional fallthrough (first service success / first fails-second succeeds / all 6 fail / invalid IP format skip / last-in-list success / cache short-circuit).
+- `test_v5140_diagnose.bats` (+16) - structural RU/EN parity on `diagnose_server` and the `_diagnose_carrier_known`, `_diagnose_carrier_list`, `_diag_line` helpers; CLI parser accepts `--carrier=NAME`; command dispatcher wires up `diagnose`; usage help mentions diagnose; functional checks on the carrier map (`beeline_msk` row matches default-preset shape, `tele2_krasnoyarsk` has `i1=absent`, `tmobile_us` has `i1=binary` + Jc=6; unknown carrier returns 1); carrier list has 7 distinct confirmed entries; previously-included unconfirmed `mts_msk` + `megafon_msk` are intentionally removed.
+
+### Compatibility
+
+- **OS**: Ubuntu 24.04 LTS, 25.10, 26.04 (with noble fallback). Debian 12 (bookworm), 13 (trixie).
+- **Arch**: amd64, arm64 (Raspberry Pi 4/5, Oracle Cloud Ampere, Hetzner CAX, AWS Graviton, other ARM VPS).
+- **Russian carriers** matrix in `ADVANCED.en.md`. The new `diagnose --carrier=NAME` recognises 7 confirmed rows; "🔄 testing" rows (Megafon Moscow, MTS Moscow) intentionally excluded until the operator range is confirmed and locked.
+
+### Out of scope
+
+- v5.14.1+: minor cleanups uncovered by post-release feedback.
+- v5.15.x: minisign signature activation (after maintainer keypair generation), per-client CPS profiles (Issue #71), `--preset=mobile-awg1` for I1=none carriers.
+
+[Full diff against v5.13.0](https://github.com/bivlked/amneziawg-installer/compare/v5.13.0...v5.14.0)
+
+---
+
 ## [5.13.0] — 2026-05-12
 
 **v5.13.0** — AmneziaWG 2.0 VPN installer release with Ubuntu 25.10 (questing) and 26.04 support, plus a `--force` safety guard against accidental re-install on a configured server. Ubuntu 24.04, Debian 12 / 13, x86_64 + ARM (Raspberry Pi, Oracle Ampere, Hetzner CAX) support — unchanged.
