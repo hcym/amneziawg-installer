@@ -174,14 +174,21 @@ sudo bash install_amneziawg.sh --jc=2 --jmin=20 --jmax=60 --yes --route-amnezia
 
 **Взаимодействие с `--disallow-ipv6`.** Туннельному IPv6 нужен форвардинг IPv6 на хосте, поэтому при сочетании `--allow-ipv6-tunnel` с `--disallow-ipv6` флаг туннеля побеждает: установщик пишет предупреждение в лог и оставляет форвардинг IPv6 на хосте включённым. Это не происходит молча.
 
-**Полный туннель при dual-stack.** Когда включён `--allow-ipv6-tunnel`, клиентский конфиг использует полный туннель по IPv4 (`AllowedIPs` начинается с `0.0.0.0/0`) независимо от выбранного режима `--route-amnezia` / `--route-custom` (split-tunnel). В v5.15.0 dual-stack подразумевает full-tunnel; сочетание split-tunnel с IPv6 внутри туннеля пока не поддерживается.
+**Маршрутизация IPv6 повторяет выбранный режим IPv4 (intent-mirroring).** Когда включён `--allow-ipv6-tunnel`, набор `AllowedIPs` клиента для IPv6 зеркалит режим IPv4:
+
+- **Полный туннель** (IPv4 `AllowedIPs` = `0.0.0.0/0`): при нативном IPv6 на сервере клиент получает `0.0.0.0/0, ::/0` - весь IPv6-трафик идёт в интернет через VPN; без нативного IPv6 клиент получает `0.0.0.0/0, fddd:2c4:2c4:2c4::/64` - IPv6 работает только между пирами внутри туннеля.
+- **Split-tunnel** (кастомный список через `--route-custom`): IPv4-список сохраняется без изменений, а к нему добавляется ТОЛЬКО туннельная ULA-подсеть `fddd:2c4:2c4:2c4::/64`. `::/0` не добавляется никогда - перехватывать весь IPv6 в split-режиме нельзя, это сломало бы раздельную маршрутизацию. IPv6 в split-туннеле доступен между пирами, но в IPv6-интернет не выходит.
+
+> Историческая заметка: в v5.15.0 dual-stack всегда подразумевал full-tunnel (split-tunnel с IPv6 вёл себя иначе). Начиная с v5.15.1 split-tunnel и IPv6 сочетаются корректно по правилам выше. Если клиент создавался на v5.15.0, пересоздайте его (`manage remove` + `add`), чтобы получить актуальный `AllowedIPs`.
 
 **Подсеть:** приватная ULA `fddd:2c4:2c4:2c4::/64`. Сервер занимает `::1`, клиенты получают `::2`, `::3` и т.д. зеркально нумерации IPv4. Подсеть можно переопределить до первого запуска через `IPV6_SUBNET=` в `/root/awg/awgsetup_cfg.init`.
 
-**Поведение с нативным IPv6 и без него.** При установке скрипт проверяет наличие глобального IPv6 на сервере (`ip -6 addr show scope global`):
+**Как определяется нативный IPv6 на сервере.** Скрипт считает, что у сервера есть маршрутизируемый в интернет IPv6, только если выполнены ОБА условия:
 
-- **Есть нативный IPv6:** клиент получает `AllowedIPs = 0.0.0.0/0, ::/0` - весь IPv6-трафик идёт через VPN и выходит в интернет.
-- **Нет нативного IPv6:** клиент получает только туннельную подсеть в `AllowedIPs` (без `::/0`): `AllowedIPs = 0.0.0.0/0, fddd:2c4:2c4:2c4::/64`. В лог выводится предупреждение. Так IPv6 работает между пирами внутри туннеля, но не уходит в интернет (иначе пакеты дропались бы в чёрную дыру). Туннель остаётся полностью рабочим по IPv4.
+1. есть глобальный IPv6-адрес вне диапазона ULA (`fc00::/7`, то есть не `fddd:...`) - проверка `ip -6 addr show scope global`;
+2. есть IPv6-маршрут по умолчанию - проверка `ip -6 route show default`.
+
+ULA-адрес сам по себе имеет scope global, но в интернет не маршрутизируется, поэтому одного адреса мало - нужен и дефолтный маршрут. Если хотя бы одно условие не выполнено, сервер считается без нативного IPv6: клиенту выдаётся туннельная ULA вместо `::/0` (по правилам маршрутизации выше), и в лог выводится предупреждение. Туннель при этом полностью работоспособен по IPv4.
 
 **Как добавить к существующей установке.** Запустите установщик повторно с `--force` и флагом туннеля:
 
@@ -204,7 +211,7 @@ sudo bash /root/awg/manage_amneziawg.sh add <имя>
 **Устранение неполадок:**
 
 - **Конфликт ULA-подсети.** Если `fddd:2c4:2c4:2c4::/64` уже используется в вашей сети, задайте другую ULA-подсеть через `IPV6_SUBNET=` до установки.
-- **IPv6 не маршрутизируется в интернет.** Проверьте, есть ли на сервере глобальный IPv6 (`ip -6 addr show scope global`). Без него выход в IPv6-интернет невозможен - это ожидаемое поведение, туннель работает по IPv4. Если IPv6 на сервере есть, проверьте правило ip6tables MASQUERADE и форвардинг (`sysctl net.ipv6.conf.all.forwarding`).
+- **IPv6 не маршрутизируется в интернет.** Проверьте оба признака нативного IPv6: глобальный адрес вне ULA (`ip -6 addr show scope global`) И маршрут по умолчанию (`ip -6 route show default`). Если нет хотя бы одного - выход в IPv6-интернет невозможен, это ожидаемое поведение, туннель работает по IPv4. Если оба признака есть, проверьте правило ip6tables MASQUERADE и форвардинг (`sysctl net.ipv6.conf.all.forwarding`).
 - **Откат / очистка IPv6.** Выключение `ALLOW_IPV6_TUNNEL=0` не удаляет уже добавленные dual-stack записи `AllowedIPs` из `awg0.conf`. Для полной очистки: `awg-quick down awg0; sed -i 's|, fddd:[^/]*/[0-9]*||g' /etc/amnezia/amneziawg/awg0.conf; awg-quick up awg0`.
 
 <a id="persistentkeepalive-adv"></a>
@@ -422,7 +429,8 @@ PersistentKeepalive = 33
   -v, --verbose         Расширенный вывод (включая DEBUG)
   --no-color            Отключить цветной вывод
   --port=НОМЕР          Установить UDP порт (1024-65535)
-  --subnet=ПОДСЕТЬ      Установить подсеть туннеля (x.x.x.x/yy)
+  --ssh-port=ПОРТ       SSH-порт для правила UFW (автодетект; список через запятую)
+  --subnet=ПОДСЕТЬ      Подсеть туннеля, только /24 (напр. 10.9.9.1/24)
   --allow-ipv6          Оставить IPv6 включенным
   --disallow-ipv6       Принудительно отключить IPv6
   --allow-ipv6-tunnel   Включить dual-stack IPv6 внутри туннеля (ULA, opt-in)
@@ -436,6 +444,7 @@ PersistentKeepalive = 33
   --jmin=N              Задать Jmin вручную (0-1280, поверх preset)
   --jmax=N              Задать Jmax вручную (0-1280, поверх preset, ≥ Jmin)
   -y, --yes             Неинтерактивный режим (все подтверждения auto-yes)
+  -f, --force           Переустановка поверх работающего AWG (ENV: AWG_FORCE_REINSTALL=1)
   --no-tweaks           Пропустить hardening/оптимизацию (без UFW, Fail2Ban, sysctl tweaks)
 ```
 
@@ -449,10 +458,12 @@ PersistentKeepalive = 33
   --no-color            Отключить цветной вывод
   --conf-dir=ПУТЬ       Указать директорию AWG (умолч: /root/awg)
   --server-conf=ПУТЬ    Указать файл конфига сервера
-  --json                JSON-вывод (для команды stats)
+  --json                JSON-вывод (для команд list / stats; list включает client_ipv6)
   --expires=ВРЕМЯ       Срок действия при add (1h, 12h, 1d, 7d, 30d, 4w)
   --apply-mode=РЕЖИМ    syncconf (умолч.) или restart (обход kernel panic)
   --psk                 (только для add) сгенерировать PresharedKey для клиента (v5.11.1+)
+  --yes                 Не спрашивать подтверждение (ENV: AWG_YES=1)
+  --carrier=NAME        (только для diagnose) сравнить параметры с профилем оператора
 ```
 
 > **`--psk`** — опциональный дополнительный слой поверх AWG 2.0 обфускации. Генерирует 32-байт симметричный ключ через `awg genpsk`, пишет его в серверный `[Peer]` и в клиентский `[Peer]` (`PresharedKey = ...`). Совместим с любым WireGuard/AmneziaWG клиентом. В batch-режиме `add c1 c2 c3 --psk` каждому клиенту выдаётся свой PSK. Без флага клиенты создаются без `PresharedKey` (default — AWG 2.0 обфускации достаточно для большинства сценариев). Флаг влияет только на новых клиентов, создаваемых этим вызовом `add` — существующие клиенты без PSK остаются без изменений и продолжают подключаться как раньше.
@@ -463,6 +474,7 @@ PersistentKeepalive = 33
 |------------|----------|
 | `AWG_SKIP_APPLY=1` | Пропустить apply_config. Для автоматизации: накопить N операций, применить одной командой |
 | `AWG_APPLY_MODE=restart` | Полный перезапуск вместо syncconf (можно сохранить в `awgsetup_cfg.init`) |
+| `AWG_YES=1` | Не спрашивать подтверждение (эквивалент флага `--yes`) |
 
 ---
 
@@ -475,7 +487,7 @@ PersistentKeepalive = 33
 
 * **`add <имя> [имя2 ...] [--expires=ВРЕМЯ] [--psk]`:** Добавить одного или нескольких клиентов. При batch-создании `awg syncconf` вызывается один раз для всех. С `--expires` — срок действия применяется ко всем. С `--psk` — для каждого генерируется отдельный PresharedKey (v5.11.1+).
 * **`remove <имя> [имя2 ...]`:** Удалить одного или нескольких клиентов. При batch-удалении apply_config вызывается один раз.
-* **`list [-v]`:** Список клиентов (с деталями при `-v`).
+* **`list [-v] [--json]`:** Список клиентов (с деталями при `-v`; `--json` - машиночитаемый формат, включает поле `client_ipv6`).
 * **`regen [имя]`:** Перегенерировать файлы `.conf`/`.png` для клиента или всех клиентов.
 * **`modify <имя> <пар> <зн>`:** Изменить параметр клиента в `.conf` файле. Допустимые параметры: DNS, Endpoint, AllowedIPs, PersistentKeepalive. После изменения QR-код и vpn:// URI автоматически перегенерируются.
 * **`backup`:** Создать резервную копию (конфиги + ключи + данные истечения клиентов + cron).
@@ -483,6 +495,8 @@ PersistentKeepalive = 33
 * **`check` / `status`:** Проверить состояние сервера (сервис, порт, AWG 2.0 параметры).
 * **`show`:** Выполнить `awg show`.
 * **`restart`:** Перезапустить сервис AmneziaWG.
+* **`diagnose [--carrier=NAME]`:** Self-troubleshooting: проверка модуля ядра, sysctl, UFW; с `--carrier` - сравнение AWG-параметров с профилем мобильного оператора.
+* **`repair-module`:** Восстановить/пересобрать модуль ядра amneziawg (DKMS) после обновления ядра сервера.
 * **`help`:** Показать справку.
 * **`stats [--json]`:** Статистика трафика по клиентам. С `--json` — машиночитаемый формат для интеграции.
 
@@ -576,7 +590,7 @@ graph TD
 Инсталлятор скачивает `awg_common.sh` и `manage_amneziawg.sh` с URL, привязанных к конкретному тегу версии:
 
 ```
-https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common.sh
+https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common.sh
 ```
 
 Это даёт **supply chain pinning**: скачиваемые скрипты соответствуют версии инсталлятора, даже если `main` уже обновлён.
@@ -596,12 +610,12 @@ AWG_BRANCH=my-feature-branch sudo bash ./install_amneziawg.sh
 
 ```bash
 # Русская версия:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/manage_amneziawg.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/manage_amneziawg.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common.sh
 
 # Английская версия:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/manage_amneziawg_en.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common_en.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/manage_amneziawg_en.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common_en.sh
 
 # Установить права
 chmod 700 /root/awg/manage_amneziawg.sh /root/awg/awg_common.sh

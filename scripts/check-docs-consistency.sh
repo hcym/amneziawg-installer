@@ -18,17 +18,23 @@
 #      в RU == EN; [Unreleased] присутствует в обоих.
 #   3. Version triple: README badge == SCRIPT_VERSION == верхний changelog
 #      heading (RU и EN).
-#   4. Матрица ОС: Ubuntu 26.04 присутствует во всех заявленных местах.
+#   4. Матрица ОС: полный набор релизов (Ubuntu 24.04/25.10/26.04, Debian 12/13)
+#      + архитектур (x86_64/ARM64/ARMv7) во всех заявленных местах.
 #   5. SECURITY/CONTRIBUTING не протухли (текущий minor в supported-таблице;
 #      нет захардкоженного test-count baseline).
 #   6. Pinned raw-URL теги в README/ADVANCED/INSTALL_VPS == SCRIPT_VERSION
 #      (CHANGELOG исключён - там теги исторические).
+#   7. ADVANCED: устаревшие IPv6 split-tunnel формулировки не вернулись
+#      (present-tense "не поддерживается / implies full-tunnel"; past-tense
+#      историческая заметка разрешена).
+#   8. Issue-template: placeholder версии нейтральный (не протухающий X.Y.Z).
 
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT" || { echo "ОШИБКА: не удалось перейти в $REPO_ROOT" >&2; exit 2; }
+command -v perl >/dev/null 2>&1 || { echo "ОШИБКА: нужен perl (slug-генерация якорей)" >&2; exit 2; }
 
 PASS=0
 FAIL=0
@@ -43,24 +49,28 @@ DOC_FILES=(
     ADVANCED.md ADVANCED.en.md
     CHANGELOG.md CHANGELOG.en.md
     SECURITY.md CONTRIBUTING.md INSTALL_VPS.md
-    docs/SIGNING_DESIGN.md docs/RELEASE_PROCESS.md
+    docs/SIGNING_DESIGN.md docs/RELEASE_PROCESS.md docs/ROADMAP.md
 )
 
 echo "=== check-docs-consistency ==="
 
-# GitHub-совместимая slug-генерация из текста заголовка:
-# lowercase, убрать всё кроме букв/цифр/пробела/дефиса, пробелы -> дефисы,
-# срезать ведущие/хвостовые дефисы (их даёт, например, emoji в начале heading -
-# GitHub их тоже не оставляет).
-_slug() {
-    local s="$1"
-    s="${s#"${s%%[![:space:]]*}"}"   # ltrim
-    s="${s%"${s##*[![:space:]]}"}"   # rtrim
-    printf '%s' "$s" \
-        | tr '[:upper:]' '[:lower:]' \
-        | LC_ALL=C sed -E 's/[^a-z0-9 _-]//g' \
-        | tr ' ' '-' \
-        | sed -E 's/^-+//; s/-+$//'
+# GitHub-совместимая slug-генерация (Unicode-aware, один perl-проход на файл
+# вместо 4 subprocess на КАЖДЫЙ заголовок). Прежняя версия и тормозила
+# (fork-оверхед на сотнях заголовков), и резала кириллицу через LC_ALL=C,
+# из-за чего RU-заголовки давали пустой slug. Читает заголовки построчно из
+# stdin, печатает по slug на строку: Unicode-lowercase, оставить буквы/цифры/
+# пробел/подчёркивание/дефис (кириллица сохраняется, как у GitHub), пробелы ->
+# дефисы, срезать крайние дефисы (их даёт, например, emoji в начале заголовка).
+_slug_stream() {
+    perl -CSD -ne '
+        chomp;
+        s/^\s+//; s/\s+$//;
+        $_ = lc;
+        s/[^\p{L}\p{N} _-]//g;
+        s/ /-/g;
+        s/^-+//; s/-+$//;
+        print "$_\n";
+    '
 }
 
 # Удалить из markdown код, чтобы примеры разметки внутри него не парсились как
@@ -85,11 +95,11 @@ for f in "${DOC_FILES[@]}"; do
     while IFS= read -r a; do
         [[ -n "$a" ]] && anchors["$a"]=1
     done < <(printf '%s\n' "$stripped" | grep -oiP '<a\s+(id|name)="\K[^"]+')
-    while IFS= read -r h; do
-        # Заголовки ATX: "# ...". Текст уже без ведущих #, slug'им.
-        sl="$(_slug "$h")"
+    # Заголовки ATX: "# ...". Снимаем ведущие #, слугаем все заголовки файла
+    # одним perl-проходом (а не subprocess на каждый заголовок).
+    while IFS= read -r sl; do
         [[ -n "$sl" ]] && anchors["$sl"]=1
-    done < <(printf '%s\n' "$stripped" | grep -E '^#{1,6}[[:space:]]' | sed -E 's/^#{1,6}[[:space:]]+//')
+    done < <(printf '%s\n' "$stripped" | grep -E '^#{1,6}[[:space:]]' | sed -E 's/^#{1,6}[[:space:]]+//' | _slug_stream)
 
     # Внутренние ссылки вида ](#anchor) в этом файле.
     while IFS= read -r ref; do
@@ -156,16 +166,41 @@ if [[ "$top_ru" != "$script_ver" ]]; then echo "  CHANGELOG.md top heading '$top
 if [[ "$top_en" != "$script_ver" ]]; then echo "  CHANGELOG.en.md top heading '$top_en' != SCRIPT_VERSION '$script_ver'" >&2; ver_fail=1; fi
 if [[ "$ver_fail" -eq 0 ]]; then _ok "version triple согласован ($script_ver)"; else _bad "version triple рассинхрон"; fi
 
-# --- 4. Матрица ОС: Ubuntu 26.04 во всех заявленных местах ---
+# --- 4. Матрица ОС + архитектур: полный набор во всех заявленных местах ---
+# Единый источник ожидаемого набора. Прежняя узкая проверка ловила только
+# "26.04" и пропускала общий drift: при будущем добавлении/удалении одной ОС
+# часть документов осталась бы со старой матрицей при зелёном docs-check.
+# Токены подобраны так, чтобы матчиться во всех форматах (badge, таблица
+# совместимости, install --help, issue dropdown): голые версии Ubuntu +
+# "Debian N" с контекстом семейства.
+EXPECTED_OS=("24.04" "25.10" "26.04" "Debian 12" "Debian 13")
+OS_MATRIX_FILES=(README.md README.en.md install_amneziawg.sh install_amneziawg_en.sh .github/ISSUE_TEMPLATE/bug_report.yml)
 os_fail=0
-for f in README.md README.en.md install_amneziawg.sh install_amneziawg_en.sh .github/ISSUE_TEMPLATE/bug_report.yml; do
-    [[ -f "$f" ]] || { echo "  нет $f (проверка 26.04)" >&2; os_fail=1; continue; }
-    if ! grep -q '26\.04' "$f"; then
-        echo "  $f: нет упоминания Ubuntu 26.04 в матрице ОС" >&2
-        os_fail=1
-    fi
+for f in "${OS_MATRIX_FILES[@]}"; do
+    [[ -f "$f" ]] || { echo "  нет $f (проверка матрицы ОС)" >&2; os_fail=1; continue; }
+    for os in "${EXPECTED_OS[@]}"; do
+        if ! grep -qF "$os" "$f"; then
+            echo "  $f: нет '$os' в матрице ОС" >&2
+            os_fail=1
+        fi
+    done
 done
-if [[ "$os_fail" -eq 0 ]]; then _ok "Ubuntu 26.04 присутствует в матрице ОС"; else _bad "Ubuntu 26.04 отсутствует где-то в матрице ОС"; fi
+if [[ "$os_fail" -eq 0 ]]; then _ok "матрица ОС полна во всех заявленных местах (${EXPECTED_OS[*]})"; else _bad "матрица ОС неполна где-то"; fi
+
+# Архитектуры: x86_64 / ARM64 / ARMv7 согласованы между README RU/EN и issue-шаблоном.
+EXPECTED_ARCH=("x86_64" "ARM64" "ARMv7")
+ARCH_MATRIX_FILES=(README.md README.en.md .github/ISSUE_TEMPLATE/bug_report.yml)
+arch_fail=0
+for f in "${ARCH_MATRIX_FILES[@]}"; do
+    [[ -f "$f" ]] || { echo "  нет $f (проверка матрицы архитектур)" >&2; arch_fail=1; continue; }
+    for a in "${EXPECTED_ARCH[@]}"; do
+        if ! grep -qF "$a" "$f"; then
+            echo "  $f: нет '$a' в матрице архитектур" >&2
+            arch_fail=1
+        fi
+    done
+done
+if [[ "$arch_fail" -eq 0 ]]; then _ok "матрица архитектур согласована (${EXPECTED_ARCH[*]})"; else _bad "матрица архитектур неполна где-то"; fi
 
 # --- 5. SECURITY/CONTRIBUTING не протухли ---
 stale_fail=0
@@ -207,6 +242,33 @@ for f in "${URL_DOCS[@]}"; do
     done < <(grep -oP 'raw\.githubusercontent\.com/bivlked/amneziawg-installer/v\K[0-9]+\.[0-9]+\.[0-9]+' "$f")
 done
 if [[ "$url_fail" -eq 0 ]]; then _ok "pinned raw-URL теги == SCRIPT_VERSION ($script_ver)"; else _bad "pinned raw-URL теги рассинхронизированы"; fi
+
+# --- 7. ADVANCED: устаревшие IPv6 split-tunnel формулировки не вернулись ---
+# После переписывания IPv6-раздела (v5.15.1 split-tunnel + dual-stack корректно
+# сочетаются) present-tense заявления о неподдержке не должны появиться снова.
+# Историческая заметка в past tense ("подразумевал", "implied") разрешена.
+ipv6_phrase_fail=0
+for f in ADVANCED.md ADVANCED.en.md; do
+    [[ -f "$f" ]] || continue
+    if grep -qE 'подразумевает full-tunnel|implies full-tunnel|пока не поддерживается|is not supported yet' "$f"; then
+        echo "  $f: устаревшая IPv6 split-tunnel формулировка (см. T2 v5.15.3)" >&2
+        ipv6_phrase_fail=1
+    fi
+done
+if [[ "$ipv6_phrase_fail" -eq 0 ]]; then _ok "ADVANCED: нет устаревших IPv6 split-tunnel формулировок"; else _bad "ADVANCED: вернулась устаревшая IPv6 формулировка"; fi
+
+# --- 8. Issue-template: placeholder версии нейтральный (не протухающий) ---
+# bug_report.yml не должен фиксировать конкретный X.Y.Z в placeholder версии -
+# он устаревает с каждым релизом. Нейтральный вид: "5.x.y".
+tmpl_fail=0
+bug_tmpl=".github/ISSUE_TEMPLATE/bug_report.yml"
+if [[ -f "$bug_tmpl" ]]; then
+    if grep -qE 'placeholder:[[:space:]]*"e\.g\.,[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+"' "$bug_tmpl"; then
+        echo "  $bug_tmpl: конкретный X.Y.Z в placeholder версии (протухает; используйте 5.x.y)" >&2
+        tmpl_fail=1
+    fi
+fi
+if [[ "$tmpl_fail" -eq 0 ]]; then _ok "issue-template: placeholder версии нейтральный"; else _bad "issue-template: протухающий placeholder версии"; fi
 
 # --- Summary ---
 echo ""

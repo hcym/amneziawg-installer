@@ -8,14 +8,14 @@ fi
 # ==============================================================================
 # Скрипт для управления пользователями (пирами) AmneziaWG 2.0
 # Автор: @bivlked
-# Версия: 5.15.2
-# Дата: 2026-06-02
+# Версия: 5.15.3
+# Дата: 2026-06-04
 # Репозиторий: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 
 # --- Безопасный режим и Константы ---
 # shellcheck disable=SC2034
-SCRIPT_VERSION="5.15.2"
+SCRIPT_VERSION="5.15.3"
 set -o pipefail
 AWG_DIR="/root/awg"
 SERVER_CONF_FILE="/etc/amnezia/amneziawg/awg0.conf"
@@ -229,6 +229,15 @@ check_dependencies() {
 # По успеху устанавливает LAST_BACKUP_PATH (используется restore_backup
 # для rollback snapshot).
 _backup_configs_nolock() {
+    # --no-prune: не удалять старые бэкапы после создания. Используется
+    # pre-restore snapshot'ом: иначе при уже накопленных 10 бэкапах prune
+    # обрезал бы самый старый, которым может оказаться именно выбранный для
+    # восстановления файл (он лежит в той же папке $AWG_DIR/backups).
+    local no_prune=0
+    if [[ "${1:-}" == "--no-prune" ]]; then
+        no_prune=1
+        shift
+    fi
     log "Создание бэкапа..."
     local bd="$AWG_DIR/backups"
     mkdir -p "$bd" || die "Ошибка mkdir $bd"
@@ -333,10 +342,12 @@ _backup_configs_nolock() {
     rm -rf "$td"
     chmod 600 "$bf" || log_warn "Ошибка chmod бэкапа"
 
-    # Оставляем максимум 10 бэкапов
-    find "$bd" -maxdepth 1 -name "awg_backup_*.tar.gz" -printf '%T@ %p\n' | \
-        sort -nr | tail -n +11 | cut -d' ' -f2- | xargs -r rm -f || \
-        log_warn "Ошибка удаления старых бэкапов"
+    # Оставляем максимум 10 бэкапов (кроме режима --no-prune)
+    if [[ "$no_prune" -eq 0 ]]; then
+        find "$bd" -maxdepth 1 -name "awg_backup_*.tar.gz" -printf '%T@ %p\n' | \
+            sort -nr | tail -n +11 | cut -d' ' -f2- | xargs -r rm -f || \
+            log_warn "Ошибка удаления старых бэкапов"
+    fi
 
     LAST_BACKUP_PATH="$bf"
     log "Бэкап создан: $bf"
@@ -495,7 +506,9 @@ restore_backup() {
     trap _restore_cleanup RETURN
 
     log "Создание бэкапа текущей..."
-    if ! _backup_configs_nolock; then
+    # --no-prune: выбранный для восстановления $bf лежит в той же папке бэкапов;
+    # prune после создания pre-restore снапшота мог бы удалить именно его.
+    if ! _backup_configs_nolock --no-prune; then
         log_error "Не удалось создать бэкап текущей конфигурации."
         return 1
     fi
@@ -608,12 +621,18 @@ restore_backup() {
         # C11: удаляю stale client-ключи, которых нет в бэкапе (server-ключи
         # лежат в AWG_DIR, не в KEYS_DIR, поэтому не затрагиваются).
         rm -f "$KEYS_DIR"/* 2>/dev/null || true
-        if ! cp -a "$td/keys/"* "$KEYS_DIR/"; then
+        # C2: keys/ в бэкапе может быть пустым (сервер без клиентских ключей).
+        # Без compgen-guard голый glob "$td/keys/*" остался бы литералом, cp упал
+        # бы, и весь restore ушёл бы в откат. Пустой keys/ - не ошибка.
+        if ! compgen -G "$td/keys/*" > /dev/null; then
+            log_debug "Бэкап без клиентских ключей (keys/ пуст) - пропуск, не ошибка."
+        elif ! cp -a "$td/keys/"* "$KEYS_DIR/"; then
             log_error "Ошибка копирования keys — восстановление прервано (запуск отката)."
             return 1
+        else
+            chmod 600 "$KEYS_DIR"/* 2>/dev/null
+            log_debug "Ключи восстановлены в $KEYS_DIR"
         fi
-        chmod 600 "$KEYS_DIR"/* 2>/dev/null
-        log_debug "Ключи восстановлены в $KEYS_DIR"
     fi
 
     # Серверные ключи: cp -a сохраняет mode из архива, поэтому форсируем 600
@@ -713,10 +732,10 @@ modify_client() {
             if [[ "$value" == \[*\]:* ]]; then
                 _eh="${value%]:*}"; _eh="${_eh#\[}"   # IPv6 без скобок
                 _ept="${value##*]:}"
-                [[ "$_eh" =~ ^[0-9A-Fa-f:]+$ ]] || { log_error "Невалидный Endpoint '$value': некорректный IPv6-хост"; return 1; }
+                _valid_ipv6 "$_eh" || { log_error "Невалидный Endpoint '$value': некорректный IPv6-хост"; return 1; }
             else
                 _eh="${value%:*}"; _ept="${value##*:}"
-                [[ "$_eh" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*|[0-9]{1,3}(\.[0-9]{1,3}){3})$ ]] || { log_error "Невалидный Endpoint '$value': ожидается host:port (FQDN / IPv4 / [IPv6])"; return 1; }
+                _valid_host_or_ipv4 "$_eh" || { log_error "Невалидный Endpoint '$value': ожидается host:port (FQDN / IPv4 / [IPv6])"; return 1; }
             fi
             { [[ "$_ept" =~ ^[0-9]+$ ]] && [[ "$_ept" -ge 1 && "$_ept" -le 65535 ]]; } || { log_error "Невалидный Endpoint '$value': порт должен быть 1-65535"; return 1; }
             ;;
@@ -727,14 +746,26 @@ modify_client() {
                     log_error "Невалидный AllowedIPs: '$value'"
                     return 1 ;;
             esac
+            # Лишние запятые: word-splitting по IFS=',' молча отбрасывает
+            # ХВОСТОВОЙ пустой элемент (например "10.0.0.0/24,"), поэтому проверяем
+            # структуру списка отдельно: ведущая/хвостовая/двойная запятая.
+            case "$value" in
+                ,*|*,|*,,*)
+                    log_error "Невалидный AllowedIPs '$value': пустой элемент списка (лишняя запятая)"
+                    return 1 ;;
+            esac
             local _aip_tok _aip_ifs="$IFS"
             IFS=','
             for _aip_tok in $value; do
                 _aip_tok="${_aip_tok//[[:space:]]/}"
-                [[ -z "$_aip_tok" ]] && continue
-                if ! [[ "$_aip_tok" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}(/[0-9]{1,2})?$ || "$_aip_tok" =~ ^[0-9A-Fa-f:]+(/[0-9]{1,3})?$ ]]; then
+                if [[ -z "$_aip_tok" ]]; then
                     IFS="$_aip_ifs"
-                    log_error "Невалидный AllowedIPs '$value': '$_aip_tok' не похож на CIDR (a.b.c.d/n или IPv6/n)"
+                    log_error "Невалидный AllowedIPs '$value': пустой элемент списка (лишняя запятая)"
+                    return 1
+                fi
+                if ! _valid_cidr "$_aip_tok"; then
+                    IFS="$_aip_ifs"
+                    log_error "Невалидный AllowedIPs '$value': '$_aip_tok' не похож на CIDR (IPv4/IPv6 с опциональным префиксом /n)"
                     return 1
                 fi
             done
@@ -1414,7 +1445,7 @@ usage() {
     echo "  -h, --help            Показать эту справку"
     echo "  -v, --verbose         Расширенный вывод (для команды list)"
     echo "  --no-color            Отключить цветной вывод"
-    echo "  --json                Машиночитаемый JSON-вывод (для команд list / show / stats)"
+    echo "  --json                Машиночитаемый JSON-вывод (для команд list / stats)"
     echo "  --expires=ВРЕМЯ       Срок действия при add (1h, 12h, 1d, 7d, 30d, 4w)"
     echo "  --conf-dir=ПУТЬ       Указать директорию AWG (умолч: $AWG_DIR)"
     echo "  --server-conf=ПУТЬ    Указать файл конфига сервера"

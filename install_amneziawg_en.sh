@@ -8,14 +8,14 @@ fi
 # ==============================================================================
 # AmneziaWG 2.0 installation and configuration script for Ubuntu/Debian servers
 # Author: @bivlked
-# Version: 5.15.2
-# Date: 2026-06-02
+# Version: 5.15.3
+# Date: 2026-06-04
 # Repository: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 
 # --- Safe mode and Constants ---
 set -o pipefail
-SCRIPT_VERSION="5.15.2"
+SCRIPT_VERSION="5.15.3"
 
 AWG_DIR="/root/awg"
 CONFIG_FILE="$AWG_DIR/awgsetup_cfg.init"
@@ -33,11 +33,11 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Verified in step5_download_scripts() after curl.
 # Verification is skipped when AWG_BRANCH is overridden (test branch).
 # Format: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="c3d45d5bf289b9aea1db79ec1c3598f4bed3fa30e6718b9c6c1e5f5189508475"
-MANAGE_SCRIPT_SHA256="e144ec611f871c6f8270f9e440acdd2984a1c394927bc43d0fa6edaf9d356822"
+COMMON_SCRIPT_SHA256="beb598e01b4725d97450e4736c222d99da00cc77351984e2e95be4b47b9d4e0a"
+MANAGE_SCRIPT_SHA256="7b078be61bb2635ab90aa1374ab783b33f3b7d89712aa00b6fc034d3fd1f5b91"
 
 # CLI flags
-UNINSTALL=0; HELP=0; DIAGNOSTIC=0; VERBOSE=0; NO_COLOR=0; AUTO_YES=0; NO_TWEAKS=0
+UNINSTALL=0; HELP=0; HELP_EXIT_RC=0; DIAGNOSTIC=0; VERBOSE=0; NO_COLOR=0; AUTO_YES=0; NO_TWEAKS=0
 FORCE_REINSTALL=0
 _APT_UPDATED=0
 CLI_PORT=""; CLI_SUBNET=""; CLI_DISABLE_IPV6="default"; CLI_SSH_PORT=""
@@ -79,7 +79,7 @@ while [[ $# -gt 0 ]]; do
         --jc=*)          CLI_JC="${1#*=}" ;;
         --jmin=*)        CLI_JMIN="${1#*=}" ;;
         --jmax=*)        CLI_JMAX="${1#*=}" ;;
-        *) echo "Unknown argument: $1"; HELP=1 ;;
+        *) echo "Unknown argument: $1" >&2; HELP=1; HELP_EXIT_RC=1 ;;
     esac
     shift
 done
@@ -291,7 +291,8 @@ Examples:
 
 Repository: https://github.com/bivlked/amneziawg-installer
 EOF
-    exit 0
+    # Explicit --help exits 0; an unknown argument exits 1 (false success in CI).
+    exit "${HELP_EXIT_RC:-0}"
 }
 
 # ==============================================================================
@@ -648,18 +649,25 @@ validate_junk_size() {
 
 validate_port() {
     local port="$1"
-    if ! [[ "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1024 ]] || [[ "$port" -gt 65535 ]]; then
+    # ^[1-9][0-9]{0,4}$ forbids leading zeros ('0080' would otherwise be parsed as
+    # octal in arithmetic and slip past the range check) and bounds the length:
+    # without a limit 64-bit (( )) arithmetic wraps, so 2^64+51820 would pass the
+    # range check. Comparison uses plain decimal.
+    if ! [[ "$port" =~ ^[1-9][0-9]{0,4}$ ]] || (( port < 1024 )) || (( port > 65535 )); then
         die "Invalid port: '$port'. Allowed range: 1024-65535."
     fi
 }
 
 validate_subnet() {
-    local subnet="$1"
-    if ! [[ "$subnet" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/24$ ]] \
-       || [[ "${BASH_REMATCH[1]}" -gt 255 ]] || [[ "${BASH_REMATCH[2]}" -gt 255 ]] \
-       || [[ "${BASH_REMATCH[3]}" -gt 255 ]] || [[ "${BASH_REMATCH[4]}" -gt 255 ]]; then
+    local subnet="$1" o
+    # Octets without leading zeros: '010.008...' would otherwise be parsed as octal
+    # in [[ -gt ]] and slip past the check. Range is compared on plain decimal values.
+    if ! [[ "$subnet" =~ ^(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})/24$ ]]; then
         die "Invalid subnet: '$subnet'. Only /24 is supported."
     fi
+    for o in "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"; do
+        (( o <= 255 )) || die "Invalid subnet: '$subnet'. Octet out of range 0-255."
+    done
     if [[ "${BASH_REMATCH[4]}" -eq 0 ]] || [[ "${BASH_REMATCH[4]}" -eq 255 ]]; then
         die "Invalid subnet: '$subnet'. Last octet cannot be 0 (network address) or 255 (broadcast)."
     fi
@@ -680,9 +688,34 @@ validate_endpoint() {
     [[ "$ep" != *$'\n'* && "$ep" != *$'\r'* && \
        "$ep" != *"'"* && "$ep" != *'"'* && "$ep" != *'\\'* && \
        "$ep" != *' '* && "$ep" != *$'\t'* ]] || return 1
-    # One of three formats: FQDN, IPv4, [IPv6]
-    [[ "$ep" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*|[0-9]{1,3}(\.[0-9]{1,3}){3}|\[[0-9A-Fa-f:]+\])$ ]] || return 1
-    # If IPv4 format — additionally validate octet range 0-255
+    # Bracketed [IPv6] form: structural check of the bracket contents. The previous
+    # charset-only test let junk like [:::] / [1:2:3] through. Mirrors _valid_ipv6.
+    if [[ "$ep" == \[*\] ]]; then
+        local inner="${ep#\[}"; inner="${inner%\]}"
+        [[ "$inner" =~ ^[0-9A-Fa-f:]+$ ]] || return 1
+        case "$inner" in
+            *:::*|*::*::*) return 1 ;;
+        esac
+        [[ "$inner" == :* && "$inner" != ::* ]] && return 1
+        [[ "$inner" == *: && "$inner" != *:: ]] && return 1
+        local has_dcolon=0; [[ "$inner" == *::* ]] && has_dcolon=1
+        local IFS=':' parts=() p ngroups=0
+        read -ra parts <<< "$inner"
+        for p in "${parts[@]}"; do
+            [[ -z "$p" ]] && continue
+            [[ "$p" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+            ngroups=$((ngroups + 1))
+        done
+        if [[ $has_dcolon -eq 1 ]]; then
+            (( ngroups <= 7 )) || return 1
+        else
+            (( ngroups == 8 )) || return 1
+        fi
+        return 0
+    fi
+    # Otherwise FQDN or IPv4
+    [[ "$ep" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*|[0-9]{1,3}(\.[0-9]{1,3}){3})$ ]] || return 1
+    # If IPv4 format - additionally validate octet range 0-255
     if [[ "$ep" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
         [[ "${BASH_REMATCH[1]}" -le 255 && "${BASH_REMATCH[2]}" -le 255 && \
            "${BASH_REMATCH[3]}" -le 255 && "${BASH_REMATCH[4]}" -le 255 ]] || return 1
@@ -691,18 +724,29 @@ validate_endpoint() {
 }
 
 validate_cidr_list() {
-    local input="$1" cidr
+    local input="$1" cidr o nospace
     input="${input//$'\r'/}"
     input="${input//$'\t'/ }"
+    # A newline means injection into awgsetup_cfg.init (read <<< only sees the
+    # first line, the rest would pass unchecked). Same policy as validate_endpoint.
+    [[ "$input" != *$'\n'* ]] || return 1
+    # Structural comma check before split: bash IFS drops a trailing empty element,
+    # so '10.0.0.0/24,' used to pass. Reject leading/trailing/double comma and empty
+    # input (spaces are ignored for this check).
+    nospace="${input// /}"
+    case "$nospace" in
+        ""|,*|*,|*,,*) return 1 ;;
+    esac
     IFS=',' read -ra cidrs <<< "$input"
     for cidr in "${cidrs[@]}"; do
-        cidr=$(echo "$cidr" | tr -d ' ')
-        if ! [[ "$cidr" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})/([0-9]{1,2})$ ]] \
-           || [[ "${BASH_REMATCH[1]}" -gt 255 ]] || [[ "${BASH_REMATCH[2]}" -gt 255 ]] \
-           || [[ "${BASH_REMATCH[3]}" -gt 255 ]] || [[ "${BASH_REMATCH[4]}" -gt 255 ]] \
-           || [[ "${BASH_REMATCH[5]}" -gt 32 ]]; then
+        cidr="${cidr// /}"
+        # Octets without leading zeros; prefix 0-32 enforced in the regex (no octal).
+        if ! [[ "$cidr" =~ ^(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})/([0-9]|[12][0-9]|3[0-2])$ ]]; then
             return 1
         fi
+        for o in "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"; do
+            (( o <= 255 )) || return 1
+        done
     done
 }
 
@@ -1904,6 +1948,14 @@ initialize_setup() {
     if [[ "$ALLOWED_IPS_MODE" == "default" ]]; then ALLOWED_IPS_MODE=2; fi
     if [[ -z "$ALLOWED_IPS" ]]; then configure_routing_mode; fi
 
+    # Single mandatory AllowedIPs validation before saving the config: CLI
+    # --route-custom on a first run assigned ALLOWED_IPS without checking it
+    # (configure_routing_mode was skipped because the mode was already 3).
+    # Validate any non-empty list regardless of its source (CLI / config / mode).
+    if [[ -n "$ALLOWED_IPS" ]] && ! validate_cidr_list "$ALLOWED_IPS"; then
+        die "Invalid ALLOWED_IPS: '$ALLOWED_IPS'. Expected a list x.x.x.x/y[,x.x.x.x/y]."
+    fi
+
     # Port check (skip if AWG service is already listening on this port)
     if ! systemctl is-active --quiet awg-quick@awg0 2>/dev/null; then
         check_port_availability "$AWG_PORT" || die "Port $AWG_PORT/udp is occupied."
@@ -1922,8 +1974,12 @@ initialize_setup() {
 
     # Save configuration
     log "Saving settings to $CONFIG_FILE..."
-    local temp_conf
-    temp_conf=$(mktemp) || die "mktemp error."
+    # temp in the target config's directory -> mv = atomic rename on the same
+    # filesystem (not a cross-fs copy+unlink when /tmp is mounted as tmpfs).
+    local temp_conf cfg_dir
+    cfg_dir="$(dirname "$CONFIG_FILE")"
+    mkdir -p "$cfg_dir" 2>/dev/null
+    temp_conf=$(mktemp -p "$cfg_dir") || die "mktemp error."
     _install_temp_files+=("$temp_conf")
     cat > "$temp_conf" << EOF
 # AmneziaWG 2.0 installation configuration (Auto-generated)
@@ -2873,14 +2929,22 @@ step6_generate_configs() {
     log "Creating server config..."
     render_server_config || die "Server config creation error."
 
-    # Restore existing [Peer] blocks from backup (excluding defaults)
+    # Restore ALL existing [Peer] blocks from backup.
+    # C5: defaults my_phone/my_laptop used to be excluded here, but the
+    # generation loop below skips peers that already exist while the guard in
+    # generate_client refuses to recreate one whose artifacts exist - so a
+    # default client became an orphan (files present, no peer block, silent
+    # connectivity loss on --force reinstall). The previous awk also dropped
+    # every peer but the last: each new [Peer] overwrote the buffer without
+    # flushing the previous one. We now flush on every [Peer] and restore ALL
+    # blocks; the idempotent loop below does not recreate what was restored.
     if [[ -n "${s_bak:-}" && -f "$s_bak" ]]; then
         local restored_peers
         restored_peers=$(awk '
-            /^\[Peer\]/ { buf=$0"\n"; in_peer=1; skip=0; next }
-            in_peer && /^\[/ { if (!skip) printf "%s\n", buf; buf=""; in_peer=0; next }
-            in_peer { buf=buf $0"\n"; if ($0 ~ /^#_Name = (my_phone|my_laptop)$/) skip=1; next }
-            END { if (in_peer && !skip) printf "%s", buf }
+            /^\[Peer\]/ { if (in_peer) printf "%s", buf; buf=$0"\n"; in_peer=1; next }
+            in_peer && /^\[/ { printf "%s", buf; buf=""; in_peer=0; next }
+            in_peer { buf=buf $0"\n"; next }
+            END { if (in_peer) printf "%s", buf }
         ' "$s_bak")
         if [[ -n "$restored_peers" ]]; then
             printf '\n%s' "$restored_peers" >> "$SERVER_CONF_FILE"

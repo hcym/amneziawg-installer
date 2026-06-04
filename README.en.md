@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/badge/Architecture-x86__64_|_ARM64_|_ARMv7-green" alt="x86_64 | ARM64 | ARMv7">
   <a href="https://github.com/bivlked/amneziawg-installer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/bivlked/amneziawg-installer" alt="License"></a>
   <img src="https://img.shields.io/badge/Status-Stable-success" alt="Status">
-  <a href="https://github.com/bivlked/amneziawg-installer/releases"><img src="https://img.shields.io/badge/Installer_Version-5.15.2-blue" alt="Version"></a>
+  <a href="https://github.com/bivlked/amneziawg-installer/releases"><img src="https://img.shields.io/badge/Installer_Version-5.15.3-blue" alt="Version"></a>
   <img src="https://img.shields.io/badge/AmneziaWG-2.0-blueviolet" alt="AWG 2.0">
   <a href="https://github.com/bivlked/amneziawg-installer/actions/workflows/shellcheck.yml"><img src="https://github.com/bivlked/amneziawg-installer/actions/workflows/shellcheck.yml/badge.svg" alt="ShellCheck"></a>
   <a href="https://github.com/bivlked/amneziawg-installer/actions/workflows/test.yml"><img src="https://github.com/bivlked/amneziawg-installer/actions/workflows/test.yml/badge.svg" alt="Tests"></a>
@@ -119,12 +119,14 @@ This installer is the headless SSH path: minimum footprint, no web panel, kernel
 > 📘 **Full deployment guide:** [Install AmneziaWG VPN server on Ubuntu/Debian VPS](INSTALL_VPS.md) - covers VPS choice, ARM, troubleshooting, and uninstall.
 
 ```bash
-wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/install_amneziawg_en.sh
+wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/install_amneziawg_en.sh
 chmod +x install_amneziawg_en.sh
 sudo bash ./install_amneziawg_en.sh
 ```
 
 > 3 commands to start. 2 reboots along the way. About 20 minutes to a working VPN. [Learn more →](#installation)
+
+> 🔐 **Integrity:** the script is fetched over HTTPS from `raw.githubusercontent.com` (pinned tag). Detached release signatures are not active yet (planned) - status and threat model in [SECURITY.md](SECURITY.md).
 
 <details>
 <summary><strong>Non-interactive installation (for automation)</strong></summary>
@@ -145,7 +147,7 @@ All parameters are accepted automatically. Details: [ADVANCED.en.md#cli-params-a
 * **One command — working VPN** — from a clean VPS to a running server with client configs and QR codes
 * **Secure by default** — UFW, Fail2Ban, sysctl hardening, strict file permissions (600/700)
 * **Easy management** — add/remove clients, temporary clients with auto-removal, traffic stats, backups
-* **4 operating systems** — Ubuntu 24.04, Ubuntu 25.10/26.04, Debian 12, Debian 13
+* **Broad OS support** - Ubuntu 24.04/25.10/26.04 and Debian 12/13
 * **x86_64 and ARM** — cloud VPS, Raspberry Pi 3/4/5, ARM64 servers (AWS Graviton, Oracle Ampere, Hetzner)
 * **Mobile network optimization** — `--preset=mobile` for Tele2, Yota, Megafon and other carriers with DPI blocking. Fine-tune with `--jc`, `--jmin`, `--jmax` ([details](ADVANCED.en.md#presets-adv))
 * **Optional dual-stack IPv6** - the `--allow-ipv6-tunnel` flag adds IPv6 inside the tunnel next to IPv4 (off by default, [details](ADVANCED.en.md#ipv6-tunnel-adv))
@@ -173,7 +175,7 @@ All parameters are accepted automatically. Details: [ADVANCED.en.md#cli-params-a
 If your VPN is unstable on mobile data, run the installer with `--preset=mobile`. Below — working configurations reported in issues and discussions:
 
 - **Yota** — Moscow, `--preset=mobile`
-- **Tele2** — Moscow (`--preset=mobile`); Krasnoyarsk (`--preset=mobile` + remove the `I1` parameter)
+- **Tele2** — Moscow (`--preset=mobile`); Krasnoyarsk (`--preset=mobile`; the May 2026 wave needed `I1=<r 48>`)
 - **Tattelecom / Letai** — Tatarstan, `--preset=mobile`
 - **Megafon** — regional networks, `--preset=mobile` + remove the `I1` parameter
 - **Beeline** — default preset, no flags needed
@@ -214,7 +216,7 @@ Your carrier is not on the list? Try `--preset=mobile`. If that doesn't work —
 
 > On ARM, the installer downloads prebuilt kernel modules when available and falls back to DKMS compilation automatically.
 
-> ⚠️ **Non-standard SSH port:** If SSH is not on port 22, run `sudo ufw allow YOUR_PORT/tcp` **before** starting the installer, otherwise you will lose access to the server.
+> ⚠️ **Non-standard SSH port:** The installer usually detects the SSH port automatically. If SSH runs on a non-standard port or autodetection is unavailable, run with `--ssh-port=YOUR_PORT` (comma-separated for several ports). As an extra conservative safeguard you can run `sudo ufw allow YOUR_PORT/tcp` **before** starting the installer.
 
 **Clients:**
 * **All platforms:** [Amnezia VPN](https://github.com/amnezia-vpn/amnezia-client/releases) **>= 4.8.12.7** — full-featured VPN client with AWG 2.0. Import via `vpn://` URI
@@ -252,8 +254,8 @@ This installation method handles interactive prompts and colored output correctl
 
 2.  **Download the script:**
     ```bash
-    wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/install_amneziawg_en.sh
-    # or: curl -fLo install_amneziawg_en.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/install_amneziawg_en.sh
+    wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/install_amneziawg_en.sh
+    # or: curl -fLo install_amneziawg_en.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/install_amneziawg_en.sh
     ```
     > Minimal Debian may not ship curl (wget is usually present) - use `wget`. The installer itself adds curl in step 1.
 3.  **Make it executable:**
@@ -268,7 +270,7 @@ This installation method handles interactive prompts and colored output correctl
 
     > **Russian version:** For Russian output, use `install_amneziawg.sh`:
     > ```bash
-    > wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/install_amneziawg.sh
+    > wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/install_amneziawg.sh
     > sudo bash ./install_amneziawg.sh
     > ```
     > The Russian version is functionally identical; only user-facing messages and logs are in Russian.
@@ -379,11 +381,11 @@ sudo bash /root/awg/manage_amneziawg.sh <command> [arguments]
 
 ```bash
 # Installation (English)
-wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/install_amneziawg_en.sh
+wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/install_amneziawg_en.sh
 sudo bash ./install_amneziawg_en.sh       # Run (+ 2 reboots)
 
 # Installation (Russian)
-wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/install_amneziawg.sh
+wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/install_amneziawg.sh
 sudo bash ./install_amneziawg.sh          # Run (+ 2 reboots)
 
 # Client management
@@ -415,6 +417,8 @@ sudo bash /root/awg/manage_amneziawg.sh restart              # Restart
 For detailed information on configuration, security settings, AWG 2.0 parameters, management commands, technical details, and more, see **[ADVANCED.en.md](ADVANCED.en.md)**.
 
 For the changelog, see **[CHANGELOG.en.md](CHANGELOG.en.md)**.
+
+For the roadmap and priorities, see **[docs/ROADMAP.md](docs/ROADMAP.md)**.
 
 ---
 
@@ -456,13 +460,13 @@ For the changelog, see **[CHANGELOG.en.md](CHANGELOG.en.md)**.
   <b>A:</b> Download the updated scripts and replace them on the server:
   <pre>
   # English version:
-  wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/manage_amneziawg_en.sh
-  wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common_en.sh
+  wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/manage_amneziawg_en.sh
+  wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common_en.sh
   chmod 700 /root/awg/manage_amneziawg.sh /root/awg/awg_common.sh
 
   # Russian version:
-  wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/manage_amneziawg.sh
-  wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common.sh
+  wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/manage_amneziawg.sh
+  wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common.sh
   chmod 700 /root/awg/manage_amneziawg.sh /root/awg/awg_common.sh
   </pre>
   Server reinstallation is not required.

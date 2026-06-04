@@ -178,14 +178,21 @@ By default the tunnel carries IPv4 only. Starting with v5.15.0 you can also enab
 
 **Interaction with `--disallow-ipv6`.** In-tunnel IPv6 needs host IPv6 forwarding, so if you combine `--allow-ipv6-tunnel` with `--disallow-ipv6` the tunnel flag wins: the installer logs a warning and keeps host IPv6 forwarding enabled. This does not happen silently.
 
-**Full-tunnel with dual-stack.** When `--allow-ipv6-tunnel` is enabled, the client config uses full-tunnel IPv4 (`AllowedIPs` starts with `0.0.0.0/0`) regardless of the selected `--route-amnezia` / `--route-custom` (split-tunnel) mode. In v5.15.0 dual-stack implies full-tunnel; combining split-tunnel with in-tunnel IPv6 is not supported yet.
+**IPv6 routing mirrors the chosen IPv4 mode (intent-mirroring).** When `--allow-ipv6-tunnel` is enabled, the client's IPv6 `AllowedIPs` mirror the IPv4 mode:
+
+- **Full tunnel** (IPv4 `AllowedIPs` = `0.0.0.0/0`): with native IPv6 on the server the client gets `0.0.0.0/0, ::/0` - all IPv6 traffic goes out to the internet through the VPN; without native IPv6 the client gets `0.0.0.0/0, fddd:2c4:2c4:2c4::/64` - IPv6 only works peer-to-peer inside the tunnel.
+- **Split-tunnel** (custom list via `--route-custom`): the IPv4 list is kept unchanged and ONLY the tunnel ULA subnet `fddd:2c4:2c4:2c4::/64` is added. `::/0` is never added - capturing all IPv6 in split mode would break split routing. IPv6 in a split tunnel reaches other peers but not the internet.
+
+> Historical note: in v5.15.0 dual-stack always implied a full tunnel (split-tunnel with IPv6 behaved differently). Since v5.15.1 split-tunnel and IPv6 combine correctly per the rules above. If a client was created on v5.15.0, recreate it (`manage remove` + `add`) to get the corrected `AllowedIPs`.
 
 **Subnet:** the private ULA `fddd:2c4:2c4:2c4::/64`. The server takes `::1`, clients get `::2`, `::3`, and so on, mirroring the IPv4 numbering. The subnet can be overridden before the first run via `IPV6_SUBNET=` in `/root/awg/awgsetup_cfg.init`.
 
-**Behavior with and without native IPv6.** During install the script checks for global IPv6 on the server (`ip -6 addr show scope global`):
+**How native IPv6 is detected on the server.** The script considers the server to have internet-routable IPv6 only when BOTH conditions hold:
 
-- **Native IPv6 present:** the client gets `AllowedIPs = 0.0.0.0/0, ::/0` - all IPv6 traffic goes through the VPN and out to the internet.
-- **No native IPv6:** the client gets only the tunnel subnet in `AllowedIPs` (no `::/0`): `AllowedIPs = 0.0.0.0/0, fddd:2c4:2c4:2c4::/64`. A warning is logged. IPv6 then works between peers inside the tunnel but does not reach the internet (otherwise packets would drop into a black hole). The tunnel stays fully functional over IPv4.
+1. a global IPv6 address outside the ULA range (`fc00::/7`, i.e. not `fddd:...`) - checked via `ip -6 addr show scope global`;
+2. a default IPv6 route - checked via `ip -6 route show default`.
+
+A ULA address has scope global on its own but is not routed to the internet, so an address alone is not enough - a default route is also required. If either condition is missing, the server is treated as having no native IPv6: the client gets the tunnel ULA instead of `::/0` (per the routing rules above) and a warning is logged. The tunnel stays fully functional over IPv4.
 
 **How to add it to an existing install.** Re-run the installer with `--force` and the tunnel flag:
 
@@ -208,7 +215,7 @@ Then re-import the new `.conf` on the device. A plain `regen` will not help here
 **Troubleshooting:**
 
 - **ULA subnet collision.** If `fddd:2c4:2c4:2c4::/64` is already used in your network, set a different ULA subnet via `IPV6_SUBNET=` before installing.
-- **IPv6 not routing to the internet.** Check whether the server has global IPv6 (`ip -6 addr show scope global`). Without it, IPv6 internet egress is not possible - this is expected, and the tunnel works over IPv4. If the server does have IPv6, check the ip6tables MASQUERADE rule and forwarding (`sysctl net.ipv6.conf.all.forwarding`).
+- **IPv6 not routing to the internet.** Check both signs of native IPv6: a global address outside ULA (`ip -6 addr show scope global`) AND a default route (`ip -6 route show default`). If either is missing, IPv6 internet egress is not possible - this is expected, and the tunnel works over IPv4. If both are present, check the ip6tables MASQUERADE rule and forwarding (`sysctl net.ipv6.conf.all.forwarding`).
 - **Rollback / IPv6 cleanup.** Setting `ALLOW_IPV6_TUNNEL=0` does not remove dual-stack `AllowedIPs` entries already added to `awg0.conf`. For a full cleanup: `awg-quick down awg0; sed -i 's|, fddd:[^/]*/[0-9]*||g' /etc/amnezia/amneziawg/awg0.conf; awg-quick up awg0`.
 
 <a id="persistentkeepalive-adv"></a>
@@ -426,7 +433,8 @@ Options:
   -v, --verbose         Verbose output (including DEBUG)
   --no-color            Disable colored output
   --port=PORT           Set UDP port (1024-65535)
-  --subnet=SUBNET       Set tunnel subnet (x.x.x.x/yy)
+  --ssh-port=PORT       SSH port for the UFW rule (auto-detected; comma-separated list)
+  --subnet=SUBNET       Tunnel subnet, /24 only (e.g. 10.9.9.1/24)
   --allow-ipv6          Keep IPv6 enabled
   --disallow-ipv6       Force-disable IPv6
   --allow-ipv6-tunnel   Enable dual-stack IPv6 inside the tunnel (ULA, opt-in)
@@ -440,6 +448,7 @@ Options:
   --jmin=N              Set Jmin manually (0-1280, overrides preset)
   --jmax=N              Set Jmax manually (0-1280, overrides preset, must be >= Jmin)
   -y, --yes             Non-interactive mode (all confirmations auto-yes)
+  -f, --force           Reinstall over a working AWG (ENV: AWG_FORCE_REINSTALL=1)
   --no-tweaks           Skip hardening/optimization (no UFW, Fail2Ban, sysctl tweaks)
 ```
 
@@ -453,10 +462,12 @@ Options:
   --no-color            Disable colored output
   --conf-dir=PATH       Specify AWG directory (default: /root/awg)
   --server-conf=PATH    Specify server config file
-  --json                JSON output (for stats command)
+  --json                JSON output (for list / stats; list includes client_ipv6)
   --expires=DURATION    Expiry duration for add (1h, 12h, 1d, 7d, 30d, 4w)
   --apply-mode=MODE     syncconf (default) or restart (bypass kernel panic)
   --psk                 (add only) generate a PresharedKey for the new client (v5.11.1+)
+  --yes                 Do not prompt for confirmation (ENV: AWG_YES=1)
+  --carrier=NAME        (diagnose only) compare parameters against a carrier profile
 ```
 
 > **`--psk`** — optional extra layer on top of AWG 2.0 obfuscation. Generates a 32-byte symmetric key via `awg genpsk` and writes it to both the server `[Peer]` and the client `[Peer]` (`PresharedKey = ...`). Compatible with any WireGuard/AmneziaWG client. In batch mode (`add c1 c2 c3 --psk`) each client gets its own PSK. Without the flag clients are created without `PresharedKey` (default — AWG 2.0 obfuscation is sufficient for most scenarios). The flag only affects the new clients created by this `add` invocation — existing clients without PSK stay untouched and keep connecting as before.
@@ -467,6 +478,7 @@ Options:
 |----------|-------------|
 | `AWG_SKIP_APPLY=1` | Skip apply_config. For automation: accumulate N operations, apply once |
 | `AWG_APPLY_MODE=restart` | Full restart instead of syncconf (can be saved in `awgsetup_cfg.init`) |
+| `AWG_YES=1` | Do not prompt for confirmation (equivalent to the `--yes` flag) |
 
 ---
 
@@ -479,7 +491,7 @@ Usage: `sudo bash /root/awg/manage_amneziawg.sh <command>`:
 
 * **`add <name> [name2 ...] [--expires=DURATION] [--psk]`:** Add one or multiple clients. In batch mode, `awg syncconf` is called once for all. With `--expires` — expiry applies to all clients. With `--psk` — each client gets its own PresharedKey (v5.11.1+).
 * **`remove <name> [name2 ...]`:** Remove one or multiple clients. In batch mode, apply_config is called once for all.
-* **`list [-v]`:** List clients (with details when using `-v`).
+* **`list [-v] [--json]`:** List clients (with details when using `-v`; `--json` - machine-readable, includes the `client_ipv6` field).
 * **`regen [name]`:** Regenerate `.conf`/`.png` files for one or all clients.
 * **`modify <name> <param> <value>`:** Modify a client parameter in the `.conf` file. Allowed parameters: DNS, Endpoint, AllowedIPs, PersistentKeepalive. QR code and vpn:// URI are automatically regenerated after modification.
 * **`backup`:** Create a backup (configs + keys + client expiry data + cron).
@@ -487,6 +499,8 @@ Usage: `sudo bash /root/awg/manage_amneziawg.sh <command>`:
 * **`check` / `status`:** Check server status (service, port, AWG 2.0 parameters).
 * **`show`:** Run `awg show`.
 * **`restart`:** Restart the AmneziaWG service.
+* **`diagnose [--carrier=NAME]`:** Self-troubleshooting: checks the kernel module, sysctl and UFW; with `--carrier` it compares AWG parameters against a mobile carrier profile.
+* **`repair-module`:** Rebuild/restore the amneziawg kernel module (DKMS) after a server kernel upgrade.
 * **`help`:** Show help.
 * **`stats [--json]`:** Per-client traffic statistics. With `--json` — machine-readable format for integration.
 
@@ -580,7 +594,7 @@ Client keys are stored in `/root/awg/keys/` (permissions 600). Server keys are i
 The installer downloads `awg_common.sh` and `manage_amneziawg.sh` from URLs pinned to the specific version tag:
 
 ```
-https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common.sh
+https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common.sh
 ```
 
 This provides **supply chain pinning**: downloaded scripts match the installer version, even if `main` has already been updated.
@@ -600,12 +614,12 @@ To update the management and shared library scripts **without reinstalling the s
 
 ```bash
 # Russian version:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/manage_amneziawg.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/manage_amneziawg.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common.sh
 
 # English version:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/manage_amneziawg_en.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.2/awg_common_en.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/manage_amneziawg_en.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.3/awg_common_en.sh
 
 # Set permissions
 chmod 700 /root/awg/manage_amneziawg.sh /root/awg/awg_common.sh

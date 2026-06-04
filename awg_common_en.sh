@@ -3,8 +3,8 @@
 # ==============================================================================
 # Shared function library for AmneziaWG 2.0
 # Author: @bivlked
-# Version: 5.15.2
-# Date: 2026-06-02
+# Version: 5.15.3
+# Date: 2026-06-04
 # Repository: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 #
@@ -23,19 +23,44 @@ KEYS_DIR="${KEYS_DIR:-$AWG_DIR/keys}"
 # NOTE: trap is NOT set here to avoid overwriting the caller's trap handler.
 # The calling script must invoke _awg_cleanup() in its own EXIT handler.
 _AWG_TEMP_FILES=()
+# File-backed temp registry: awg_mktemp is usually called via $(...) (a
+# subshell), where the _AWG_TEMP_FILES array mutation is lost in the parent. A
+# file survives the subshell, so _awg_cleanup can reliably remove even a temp
+# created inside command substitution (e.g. an interrupted config write between
+# mktemp and mv). $$ is the calling script's PID, stable across its subshells.
+_AWG_TEMP_REGISTRY="${TMPDIR:-/tmp}/.awg_temp_registry.$$"
 
 _awg_cleanup() {
     local f
     for f in "${_AWG_TEMP_FILES[@]}"; do
         [[ -f "$f" ]] && rm -f "$f"
     done
+    if [[ -n "${_AWG_TEMP_REGISTRY:-}" && -f "$_AWG_TEMP_REGISTRY" ]]; then
+        while IFS= read -r f; do
+            [[ -n "$f" && -f "$f" ]] && rm -f "$f"
+        done < "$_AWG_TEMP_REGISTRY"
+        rm -f "$_AWG_TEMP_REGISTRY"
+    fi
 }
 
-# mktemp wrapper with auto-cleanup
+# mktemp wrapper with auto-cleanup.
+# Optional 1st argument - target directory: the temp file is created in the same
+# directory where the final file will live, so the subsequent mv is an atomic
+# rename within one filesystem rather than a cross-fs copy+unlink (matters when
+# /tmp is mounted as tmpfs). With no argument the behaviour is unchanged (/tmp
+# or $TMPDIR) - backward compatible.
 awg_mktemp() {
-    local f
-    f=$(mktemp) || return 1
+    local dir="${1:-}" f
+    if [[ -n "$dir" ]]; then
+        mkdir -p "$dir" 2>/dev/null
+        f=$(mktemp -p "$dir") || return 1
+    else
+        f=$(mktemp) || return 1
+    fi
     _AWG_TEMP_FILES+=("$f")
+    # Mirror the path into the file registry - it survives a subshell
+    # ($(awg_mktemp ...)), unlike the array above.
+    [[ -n "${_AWG_TEMP_REGISTRY:-}" ]] && printf '%s\n' "$f" >> "$_AWG_TEMP_REGISTRY" 2>/dev/null
     echo "$f"
 }
 
@@ -50,6 +75,88 @@ fi
 # ==============================================================================
 # Utilities
 # ==============================================================================
+
+# --- IP / CIDR validators (shared by install and manage) ---
+# These check numeric ranges, not just shape: IPv4 octets 0-255, IPv4 prefix
+# 0-32, IPv6 0-128. A bare address (no prefix) is valid (wireguard-tools treats
+# a bare IPv4 as /32 and a bare IPv6 as /128 - a host route).
+
+# _valid_ipv4 <addr> : exactly 4 octets, each 0-255 (10# avoids a leading-zero
+# octet being read as octal inside (( )) ).
+_valid_ipv4() {
+    local ip="$1"
+    [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
+    local o
+    for o in "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"; do
+        (( 10#$o <= 255 )) || return 1
+    done
+    return 0
+}
+
+# _valid_ipv6 <addr> : structural check (not just charset). Allows one "::"
+# compression; without it requires exactly 8 groups of 1-4 hex digits, with it
+# at most 7. Embedded IPv4 (::ffff:1.2.3.4) is intentionally unsupported - it
+# does not occur in tunnel AllowedIPs and the dots are rejected by the charset.
+_valid_ipv6() {
+    local ip="$1"
+    [[ "$ip" =~ ^[0-9A-Fa-f:]+$ ]] || return 1
+    case "$ip" in
+        *:::*)   return 1 ;;                     # three or more ":" in a row
+        *::*::*) return 1 ;;                     # more than one "::"
+    esac
+    [[ "$ip" == :* && "$ip" != ::* ]] && return 1   # lone leading ":"
+    [[ "$ip" == *: && "$ip" != *:: ]] && return 1   # lone trailing ":"
+    local has_dcolon=0
+    [[ "$ip" == *::* ]] && has_dcolon=1
+    local IFS=':' parts=() p ngroups=0
+    read -ra parts <<< "$ip"
+    for p in "${parts[@]}"; do
+        [[ -z "$p" ]] && continue                 # empty fields from "::"
+        [[ "$p" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+        (( ngroups++ ))
+    done
+    if [[ $has_dcolon -eq 1 ]]; then
+        (( ngroups <= 7 )) || return 1            # "::" stands for >=1 group
+    else
+        (( ngroups == 8 )) || return 1
+    fi
+    return 0
+}
+
+# _valid_cidr <token> : IPv4/IPv6 address with an optional prefix. If present,
+# the prefix must be a number in range (IPv4 0-32, IPv6 0-128). An empty prefix
+# after "/" (e.g. "1.2.3.4/") is rejected.
+_valid_cidr() {
+    local tok="$1" addr prefix
+    if [[ "$tok" == */* ]]; then
+        addr="${tok%/*}"; prefix="${tok##*/}"
+        [[ "$prefix" =~ ^[0-9]+$ ]] || return 1
+    else
+        addr="$tok"; prefix=""
+    fi
+    if _valid_ipv4 "$addr"; then
+        [[ -z "$prefix" ]] && return 0
+        (( 10#$prefix <= 32 )) || return 1
+        return 0
+    elif _valid_ipv6 "$addr"; then
+        [[ -z "$prefix" ]] && return 0
+        (( 10#$prefix <= 128 )) || return 1
+        return 0
+    fi
+    return 1
+}
+
+# _valid_host_or_ipv4 <host> : for Endpoint - a valid IPv4 OR an FQDN.
+_valid_host_or_ipv4() {
+    local host="$1"
+    _valid_ipv4 "$host" && return 0
+    [[ "$host" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$ ]] || return 1
+    # An all-numeric last label is not a real TLD (RFC 3696) but more likely a
+    # malformed IPv4 (e.g. "999.1.1.1"); reject it so a typo'd IP is not accepted.
+    local last="${host##*.}"
+    [[ "$last" =~ ^[0-9]+$ ]] && return 1
+    return 0
+}
 
 # Detect primary network interface
 get_main_nic() {
@@ -754,7 +861,7 @@ _ensure_server_public_key() {
     fi
     mkdir -p "$AWG_DIR"
     local _tmp
-    _tmp=$(awg_mktemp) || return 1
+    _tmp=$(awg_mktemp "$AWG_DIR") || return 1
     if ! echo "$_srv_priv" | awg pubkey > "$_tmp"; then
         rm -f "$_tmp"
         log_error "awg pubkey failed to compute the public key"
@@ -848,9 +955,11 @@ render_server_config() {
         postdown="${postdown}; ip6tables -D FORWARD -i %i -j ACCEPT; ip6tables -t nat -D POSTROUTING -o ${nic} -j MASQUERADE"
     fi
 
-    # Build config via temp file (atomic write)
+    # Build config via temp file (atomic write).
+    # Create temp in the target config's directory so mv is an atomic rename on
+    # the same filesystem (not a cross-fs copy+unlink when /tmp is tmpfs).
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "mktemp failed"; return 1; }
+    tmpfile=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "mktemp failed"; return 1; }
 
     cat > "$tmpfile" << EOF
 [Interface]
@@ -983,8 +1092,9 @@ render_client_config() {
         fi
     fi
 
+    # temp in the client config dir ($AWG_DIR) -> mv = atomic rename.
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "mktemp failed"; return 1; }
+    tmpfile=$(awg_mktemp "$AWG_DIR") || { log_error "mktemp failed"; return 1; }
 
     local address_line
     if [[ -n "$client_ipv6" ]]; then
@@ -1188,9 +1298,10 @@ add_peer_to_server() {
         return 1
     fi
 
-    # Add peer via temp file (atomic)
+    # Add peer via temp file (atomic).
+    # temp in the server config dir -> mv = atomic rename on the same filesystem.
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "mktemp failed"; return 1; }
+    tmpfile=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "mktemp failed"; return 1; }
 
     cp "$SERVER_CONF_FILE" "$tmpfile" || {
         rm -f "$tmpfile"
@@ -1251,8 +1362,9 @@ remove_peer_from_server() {
         return 1
     fi
 
+    # temp in the server config dir -> the final mv is an atomic rename.
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "mktemp failed"; exec {lock_fd}>&-; return 1; }
+    tmpfile=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "mktemp failed"; exec {lock_fd}>&-; return 1; }
 
     # Remove [Peer] block containing #_Name = name
     # Logic: buffer each [Peer] block, check name, print only if not matching
@@ -1286,9 +1398,10 @@ remove_peer_from_server() {
     }
     ' "$SERVER_CONF_FILE" > "$tmpfile"
 
-    # Normalize: squeeze multiple blank lines into one
+    # Normalize: squeeze multiple blank lines into one.
+    # tmpclean lives on the same filesystem as tmpfile (mv tmpclean->tmpfile atomic).
     local tmpclean
-    tmpclean=$(awg_mktemp) || { log_error "mktemp failed"; exec {lock_fd}>&-; return 1; }
+    tmpclean=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "mktemp failed"; exec {lock_fd}>&-; return 1; }
     if cat -s "$tmpfile" > "$tmpclean" 2>/dev/null; then
         mv "$tmpclean" "$tmpfile"
     else
@@ -1328,12 +1441,22 @@ generate_qr() {
         return 1
     fi
 
-    qrencode -t png -o "$png_file" < "$conf_file" || {
+    # C4: generate into a temp file and move it into place atomically, so an
+    # interrupted qrencode cannot leave a partial/corrupt PNG over the working
+    # one (as generate_qr_vpnuri already does). tmp sits in the same directory
+    # as png_file, so mv is an atomic rename on one filesystem.
+    local tmp_png="${png_file}.tmp.$$"
+    if ! qrencode -t png -o "$tmp_png" < "$conf_file"; then
         log_error "Failed to generate QR code for '$name'"
+        rm -f "$tmp_png"
         return 1
-    }
-
-    chmod 600 "$png_file"
+    fi
+    chmod 600 "$tmp_png" 2>/dev/null
+    if ! mv -f "$tmp_png" "$png_file"; then
+        log_error "Failed to save QR code for '$name'"
+        rm -f "$tmp_png"
+        return 1
+    fi
     log_debug "QR code for '$name' created: $png_file"
     return 0
 }
@@ -1550,7 +1673,11 @@ generate_qr_vpnuri() {
         return 1
     fi
 
-    mv -f "$tmp_png" "$png_file"
+    if ! mv -f "$tmp_png" "$png_file"; then
+        log_error "Failed to save vpn:// QR for '$name'"
+        rm -f "$tmp_png"
+        return 1
+    fi
     log_debug "vpn:// QR for '$name' created: $png_file"
     return 0
 }

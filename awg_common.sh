@@ -3,8 +3,8 @@
 # ==============================================================================
 # Общая библиотека функций для AmneziaWG 2.0
 # Автор: @bivlked
-# Версия: 5.15.2
-# Дата: 2026-06-02
+# Версия: 5.15.3
+# Дата: 2026-06-04
 # Репозиторий: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 #
@@ -23,19 +23,43 @@ KEYS_DIR="${KEYS_DIR:-$AWG_DIR/keys}"
 # ВАЖНО: trap НЕ устанавливается здесь, чтобы не перезаписать trap вызывающего скрипта.
 # Вызывающий скрипт должен вызвать _awg_cleanup() в своём обработчике EXIT.
 _AWG_TEMP_FILES=()
+# Файл-реестр temp-файлов: awg_mktemp часто вызывается через $(...) (subshell),
+# где правка массива _AWG_TEMP_FILES теряется в родителе. Файл переживает
+# subshell, поэтому _awg_cleanup надёжно удалит даже temp, созданный в
+# подстановке команды (например прерванная запись конфига между mktemp и mv).
+# $$ = PID вызывающего скрипта, стабилен для всех его subshell.
+_AWG_TEMP_REGISTRY="${TMPDIR:-/tmp}/.awg_temp_registry.$$"
 
 _awg_cleanup() {
     local f
     for f in "${_AWG_TEMP_FILES[@]}"; do
         [[ -f "$f" ]] && rm -f "$f"
     done
+    if [[ -n "${_AWG_TEMP_REGISTRY:-}" && -f "$_AWG_TEMP_REGISTRY" ]]; then
+        while IFS= read -r f; do
+            [[ -n "$f" && -f "$f" ]] && rm -f "$f"
+        done < "$_AWG_TEMP_REGISTRY"
+        rm -f "$_AWG_TEMP_REGISTRY"
+    fi
 }
 
-# Обёртка mktemp с автоочисткой
+# Обёртка mktemp с автоочисткой.
+# Опциональный 1-й аргумент - целевой каталог: temp создаётся в нём же, где
+# окажется итоговый файл, чтобы последующий mv был атомарным rename в пределах
+# одной ФС, а не cross-fs copy+unlink (важно, когда /tmp смонтирован как tmpfs).
+# Без аргумента поведение прежнее (/tmp или $TMPDIR) - обратная совместимость.
 awg_mktemp() {
-    local f
-    f=$(mktemp) || return 1
+    local dir="${1:-}" f
+    if [[ -n "$dir" ]]; then
+        mkdir -p "$dir" 2>/dev/null
+        f=$(mktemp -p "$dir") || return 1
+    else
+        f=$(mktemp) || return 1
+    fi
     _AWG_TEMP_FILES+=("$f")
+    # Дублируем путь в файл-реестр - он переживает subshell ($(awg_mktemp ...)),
+    # в отличие от массива выше.
+    [[ -n "${_AWG_TEMP_REGISTRY:-}" ]] && printf '%s\n' "$f" >> "$_AWG_TEMP_REGISTRY" 2>/dev/null
     echo "$f"
 }
 
@@ -50,6 +74,88 @@ fi
 # ==============================================================================
 # Утилиты
 # ==============================================================================
+
+# --- Валидаторы IP / CIDR (общие для install и manage) ---
+# Проверяют не только форму, но и числовые диапазоны: октеты IPv4 0-255,
+# префикс IPv4 0-32, IPv6 0-128. Без префикса адрес валиден (wireguard-tools
+# трактует голый IPv4 как /32, IPv6 как /128 - host-route).
+
+# _valid_ipv4 <addr> : ровно 4 октета, каждый 0-255 (10# защищает от трактовки
+# ведущего нуля как восьмеричного числа в (( )) ).
+_valid_ipv4() {
+    local ip="$1"
+    [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]] || return 1
+    local o
+    for o in "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "${BASH_REMATCH[4]}"; do
+        (( 10#$o <= 255 )) || return 1
+    done
+    return 0
+}
+
+# _valid_ipv6 <addr> : структурная проверка (не только charset). Допускает одну
+# компрессию "::"; без неё требует ровно 8 групп по 1-4 hex; с ней - не более 7.
+# Встроенный IPv4 (::ffff:1.2.3.4) намеренно не поддержан - в AllowedIPs туннеля
+# не встречается, а точки уже отсекаются charset-проверкой.
+_valid_ipv6() {
+    local ip="$1"
+    [[ "$ip" =~ ^[0-9A-Fa-f:]+$ ]] || return 1
+    case "$ip" in
+        *:::*)   return 1 ;;                     # три и более ":" подряд
+        *::*::*) return 1 ;;                     # более одной "::"
+    esac
+    [[ "$ip" == :* && "$ip" != ::* ]] && return 1   # одиночное ведущее ":"
+    [[ "$ip" == *: && "$ip" != *:: ]] && return 1   # одиночное хвостовое ":"
+    local has_dcolon=0
+    [[ "$ip" == *::* ]] && has_dcolon=1
+    local IFS=':' parts=() p ngroups=0
+    read -ra parts <<< "$ip"
+    for p in "${parts[@]}"; do
+        [[ -z "$p" ]] && continue                 # пустые поля от "::"
+        [[ "$p" =~ ^[0-9A-Fa-f]{1,4}$ ]] || return 1
+        (( ngroups++ ))
+    done
+    if [[ $has_dcolon -eq 1 ]]; then
+        (( ngroups <= 7 )) || return 1            # "::" заменяет >=1 группу
+    else
+        (( ngroups == 8 )) || return 1
+    fi
+    return 0
+}
+
+# _valid_cidr <token> : IPv4/IPv6 адрес с опциональным префиксом. Префикс, если
+# задан, обязан быть числом в допустимом диапазоне (IPv4 0-32, IPv6 0-128).
+# Пустой префикс после "/" (например "1.2.3.4/") отвергается.
+_valid_cidr() {
+    local tok="$1" addr prefix
+    if [[ "$tok" == */* ]]; then
+        addr="${tok%/*}"; prefix="${tok##*/}"
+        [[ "$prefix" =~ ^[0-9]+$ ]] || return 1
+    else
+        addr="$tok"; prefix=""
+    fi
+    if _valid_ipv4 "$addr"; then
+        [[ -z "$prefix" ]] && return 0
+        (( 10#$prefix <= 32 )) || return 1
+        return 0
+    elif _valid_ipv6 "$addr"; then
+        [[ -z "$prefix" ]] && return 0
+        (( 10#$prefix <= 128 )) || return 1
+        return 0
+    fi
+    return 1
+}
+
+# _valid_host_or_ipv4 <host> : для Endpoint - корректный IPv4 ИЛИ FQDN.
+_valid_host_or_ipv4() {
+    local host="$1"
+    _valid_ipv4 "$host" && return 0
+    [[ "$host" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*$ ]] || return 1
+    # Полностью числовая последняя метка = не настоящий TLD (RFC 3696), а скорее
+    # битый IPv4 (например "999.1.1.1"); отвергаем, чтобы не принять опечатку в IP.
+    local last="${host##*.}"
+    [[ "$last" =~ ^[0-9]+$ ]] && return 1
+    return 0
+}
 
 # Определение основного сетевого интерфейса
 get_main_nic() {
@@ -751,7 +857,7 @@ _ensure_server_public_key() {
     fi
     mkdir -p "$AWG_DIR"
     local _tmp
-    _tmp=$(awg_mktemp) || return 1
+    _tmp=$(awg_mktemp "$AWG_DIR") || return 1
     if ! echo "$_srv_priv" | awg pubkey > "$_tmp"; then
         rm -f "$_tmp"
         log_error "Не удалось вычислить публичный ключ через awg pubkey"
@@ -844,9 +950,11 @@ render_server_config() {
         postdown="${postdown}; ip6tables -D FORWARD -i %i -j ACCEPT; ip6tables -t nat -D POSTROUTING -o ${nic} -j MASQUERADE"
     fi
 
-    # Формируем конфиг через временный файл (атомарная запись)
+    # Формируем конфиг через временный файл (атомарная запись).
+    # temp создаём в каталоге итогового конфига, чтобы mv был атомарным rename
+    # на той же ФС (а не cross-fs copy+unlink, если /tmp = tmpfs).
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "Ошибка mktemp"; return 1; }
+    tmpfile=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "Ошибка mktemp"; return 1; }
 
     cat > "$tmpfile" << EOF
 [Interface]
@@ -979,8 +1087,9 @@ render_client_config() {
         fi
     fi
 
+    # temp в каталоге клиентского конфига ($AWG_DIR) -> mv = атомарный rename.
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "Ошибка mktemp"; return 1; }
+    tmpfile=$(awg_mktemp "$AWG_DIR") || { log_error "Ошибка mktemp"; return 1; }
 
     local address_line
     if [[ -n "$client_ipv6" ]]; then
@@ -1184,9 +1293,10 @@ add_peer_to_server() {
         return 1
     fi
 
-    # Добавляем пир через временный файл (атомарно)
+    # Добавляем пир через временный файл (атомарно).
+    # temp в каталоге серверного конфига -> mv = атомарный rename на той же ФС.
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "Ошибка mktemp"; return 1; }
+    tmpfile=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "Ошибка mktemp"; return 1; }
 
     cp "$SERVER_CONF_FILE" "$tmpfile" || {
         rm -f "$tmpfile"
@@ -1247,8 +1357,9 @@ remove_peer_from_server() {
         return 1
     fi
 
+    # temp в каталоге серверного конфига -> финальный mv = атомарный rename.
     local tmpfile
-    tmpfile=$(awg_mktemp) || { log_error "Ошибка mktemp"; exec {lock_fd}>&-; return 1; }
+    tmpfile=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "Ошибка mktemp"; exec {lock_fd}>&-; return 1; }
 
     # Удаляем блок [Peer] содержащий #_Name = name
     # Логика: буферизуем каждый [Peer] блок, проверяем имя, выводим только если не совпадает
@@ -1282,9 +1393,10 @@ remove_peer_from_server() {
     }
     ' "$SERVER_CONF_FILE" > "$tmpfile"
 
-    # Нормализация: сжать множественные пустые строки в одну
+    # Нормализация: сжать множественные пустые строки в одну.
+    # tmpclean - на той же ФС, что и tmpfile (mv tmpclean->tmpfile атомарен).
     local tmpclean
-    tmpclean=$(awg_mktemp) || { log_error "Ошибка mktemp"; exec {lock_fd}>&-; return 1; }
+    tmpclean=$(awg_mktemp "$(dirname "$SERVER_CONF_FILE")") || { log_error "Ошибка mktemp"; exec {lock_fd}>&-; return 1; }
     if cat -s "$tmpfile" > "$tmpclean" 2>/dev/null; then
         mv "$tmpclean" "$tmpfile"
     else
@@ -1324,12 +1436,22 @@ generate_qr() {
         return 1
     fi
 
-    qrencode -t png -o "$png_file" < "$conf_file" || {
+    # C4: генерируем во временный файл и атомарно переносим (mv) - чтобы
+    # прерывание qrencode не оставило частичный/битый PNG поверх рабочего
+    # (как уже сделано в generate_qr_vpnuri). tmp лежит в той же папке, что и
+    # png_file, поэтому mv - атомарный rename на одной ФС.
+    local tmp_png="${png_file}.tmp.$$"
+    if ! qrencode -t png -o "$tmp_png" < "$conf_file"; then
         log_error "Ошибка генерации QR-кода для '$name'"
+        rm -f "$tmp_png"
         return 1
-    }
-
-    chmod 600 "$png_file"
+    fi
+    chmod 600 "$tmp_png" 2>/dev/null
+    if ! mv -f "$tmp_png" "$png_file"; then
+        log_error "Ошибка сохранения QR-кода для '$name'"
+        rm -f "$tmp_png"
+        return 1
+    fi
     log_debug "QR-код для '$name' создан: $png_file"
     return 0
 }
@@ -1544,7 +1666,11 @@ generate_qr_vpnuri() {
         return 1
     fi
 
-    mv -f "$tmp_png" "$png_file"
+    if ! mv -f "$tmp_png" "$png_file"; then
+        log_error "Ошибка сохранения QR vpn:// для '$name'"
+        rm -f "$tmp_png"
+        return 1
+    fi
     log_debug "QR vpn:// для '$name' создан: $png_file"
     return 0
 }

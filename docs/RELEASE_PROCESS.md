@@ -8,19 +8,27 @@ clear before it is tagged.
 
 ## Versioned files and the lockstep rule
 
-Six scripts carry a version and must stay in lockstep:
+Six scripts carry a version and must stay in lockstep at the **same** release
+number:
 
 - `install_amneziawg.sh`, `install_amneziawg_en.sh`
 - `manage_amneziawg.sh`, `manage_amneziawg_en.sh`
 - `awg_common.sh`, `awg_common_en.sh`
 
-When any of them changes in a release:
+On every release, regardless of which files changed content:
 
-1. Bump `SCRIPT_VERSION` and the `# Version:` / `# Версия:` header (plus the
-   date) only in the files that actually changed.
-2. The installers download the helper scripts over the network and verify
-   their SHA256 against pinned constants. If `awg_common*.sh` or
-   `manage_amneziawg*.sh` changed, recompute the four pins
+1. Set `SCRIPT_VERSION` in all four scripts that carry it
+   (`install_amneziawg*.sh`, `manage_amneziawg*.sh`) and the
+   `# Version:` / `# Версия:` header in all six scripts to the same new
+   `X.Y.Z`. `preflight-check.sh` step 7 rejects a partial bump: it requires all
+   four `SCRIPT_VERSION` values and all six headers to agree. Update the header
+   date in every file you edited; an untouched file may keep its existing date
+   as long as the version matches. (The version-triple check also ties
+   `SCRIPT_VERSION` to the README badge and the top changelog heading, so this
+   number is the release tag.)
+2. Bumping the `# Version:` / `# Версия:` header in `awg_common*.sh` and
+   `manage_amneziawg*.sh` changes their bytes, so their SHA256 changes on every
+   release even when their logic did not. Recompute the four pins
    (`COMMON_SCRIPT_SHA256` / `MANAGE_SCRIPT_SHA256`, RU + EN) with:
 
    ```bash
@@ -31,6 +39,11 @@ When any of them changes in a release:
    A mismatched pin means a fresh install fails the over-the-network integrity
    check, so the pins must be recomputed after the helper scripts are final and
    before the tag is pushed.
+3. Bump the pinned raw-URL tags in `README*.md`, `ADVANCED*.md` and
+   `INSTALL_VPS.md` from the previous `vX.Y.Z` to the new one. Users copy the
+   install and update one-liners verbatim, so a stale tag silently installs the
+   previous release. `check-docs-consistency.sh` (preflight step 9) enforces
+   that these tags equal `SCRIPT_VERSION`, but the bump itself is manual.
 
 ## Pre-tag checklist
 
@@ -77,21 +90,43 @@ Also confirm by hand before tagging:
   all agree.
 - Ubuntu / Debian support matrix is current everywhere it is stated (README,
   installer `--help`, issue template).
+- The public roadmap issue
+  ([#79](https://github.com/bivlked/amneziawg-installer/issues/79)) reflects the
+  release: shipped items move to "Recently shipped" and leave the plan sections,
+  in both the RU and EN halves of the issue body.
+
+## External-review gate (significant releases)
+
+A significant release is developed on a public `dev/vX.Y.Z` branch pushed to
+origin, with a draft PR into `main`, so other teams can review the code before
+it is tagged. Do not merge until the review is addressed,
+`preflight-check.sh` is green, and the maintainer has explicitly approved the
+tag. Keep the PR description to clean public context only (no internal tooling
+notes). This review gate sits between implementation and the tagging steps
+below.
 
 ## Tagging and the two release workflows
 
 A tag push (`git push origin vX.Y.Z`) triggers two independent workflows:
 
 - `release.yml` (about 30 seconds): runs the preflight gate, then creates the
-  GitHub Release from the matching `CHANGELOG.en.md` section. The publish step
-  depends on the gate, so a tag that fails preflight does not produce a
-  release.
+  GitHub Release with the bilingual body and title assembled by
+  `scripts/build-release-notes.sh` from both changelogs (see "Release notes"
+  below). The publish step depends on the gate, so a tag that fails preflight
+  does not produce a release.
 - `arm-build.yml` (about 20-30 minutes): builds the ARM prebuilt `.deb`
   packages under QEMU and publishes them to the separate `arm-packages`
   release. This is a separate, slower track and does not block the main
-  release.
+  release. For a reproducible build, pin the upstream kernel-module ref (a tag)
+  in `scripts/arm-module-version.txt` before tagging; left at `HEAD` it builds
+  the upstream default branch. Each `.deb` ships with a `.manifest.json`
+  recording the installer tag, the exact upstream commit, the kernel version and
+  the SHA256, so the mutable `arm-packages` assets stay auditable.
 
-The release is not finished until both runs are green.
+The release is not finished until both runs are green. After they are, open the
+rendered README on GitHub and confirm the install and update one-liners point at
+the new tag - a final guard against a stale raw-URL slipping past the automated
+check.
 
 If the preflight gate fails on a pushed tag, the release is not published.
 Delete the tag (`git push origin :refs/tags/vX.Y.Z` and `git tag -d vX.Y.Z`),
@@ -99,16 +134,30 @@ fix the branch, and re-tag.
 
 ## Release notes
 
-`release.yml` fills the English release body from `CHANGELOG.en.md`. Add the
-Russian section by hand afterwards:
+`release.yml` now builds the release body and title automatically via
+`scripts/build-release-notes.sh`. It assembles the bilingual body from both
+changelogs (Russian header, a `[English version below](#english-version)` link,
+the Russian content, an `<a id="english-version"></a>` anchor, then the English
+content) and derives a descriptive title from the EN lead line
+`**vX.Y.Z** - <summary>.` (giving `vX.Y.Z: <summary>`, or just `vX.Y.Z` if no
+lead is present). The job fails before publishing if the version section is
+missing from either `CHANGELOG.md` or `CHANGELOG.en.md`.
+
+Because the title comes from the changelog lead, write each release's EN lead
+line in that form so the generated title reads well.
+
+You can preview locally before tagging:
 
 ```bash
-gh release edit vX.Y.Z --notes-file body.md
+bash scripts/build-release-notes.sh X.Y.Z          # body
+bash scripts/build-release-notes.sh --title X.Y.Z  # title
 ```
 
-Follow the established bilingual template: Russian header, a
-`[English version below](#english-version)` link, the Russian content, an
-`<a id="english-version"></a>` anchor, then the English content.
+Emergency fallback only (if the automated body needs a manual touch-up):
+
+```bash
+gh release edit vX.Y.Z --notes-file body.md --title "vX.Y.Z: <short summary>"
+```
 
 ## Release signing
 
