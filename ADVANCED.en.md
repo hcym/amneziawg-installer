@@ -442,7 +442,7 @@ Options:
   --route-all           Mode: All traffic (0.0.0.0/0)
   --route-amnezia       Mode: Amnezia List + DNS (default)
   --route-custom=NETS   Mode: Only specified networks
-  --endpoint=IP         Specify external IP (for servers behind NAT)
+  --endpoint=ADDR       External server endpoint: FQDN, IPv4 or [IPv6] (NAT)
   --preset=TYPE         Obfuscation parameter preset: default, mobile
                         mobile: Jc=3, narrow Jmax — for mobile carriers (Tele2, Yota, Megafon)
   --jc=N                Set Jc manually (1-128, overrides preset)
@@ -450,7 +450,8 @@ Options:
   --jmax=N              Set Jmax manually (0-1280, overrides preset, must be >= Jmin)
   -y, --yes             Non-interactive mode (all confirmations auto-yes)
   -f, --force           Reinstall over a working AWG (ENV: AWG_FORCE_REINSTALL=1)
-  --no-tweaks           Skip hardening/optimization (no UFW, Fail2Ban, sysctl tweaks)
+  --no-tweaks           Skip optional hardening/optimization (UFW, Fail2Ban);
+                        the minimal forwarding sysctl is always applied
 ```
 
 <a id="manage-cli-adv"></a>
@@ -595,7 +596,7 @@ Client keys are stored in `/root/awg/keys/` (permissions 600). Server keys are i
 The installer downloads `awg_common.sh` and `manage_amneziawg.sh` from URLs pinned to the specific version tag:
 
 ```
-https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/awg_common.sh
+https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/awg_common.sh
 ```
 
 This provides **supply chain pinning**: downloaded scripts match the installer version, even if `main` has already been updated.
@@ -615,12 +616,12 @@ To update the management and shared library scripts **without reinstalling the s
 
 ```bash
 # Russian version:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/manage_amneziawg.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/awg_common.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/manage_amneziawg.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/awg_common.sh
 
 # English version:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/manage_amneziawg_en.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/awg_common_en.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/manage_amneziawg_en.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/awg_common_en.sh
 
 # Set permissions
 chmod 700 /root/awg/manage_amneziawg.sh /root/awg/awg_common.sh
@@ -972,10 +973,13 @@ sudo bash /root/awg/manage_amneziawg.sh stats --json
     "rx": 1332477952,
     "tx": 374083174,
     "last_handshake": 1710312180,
-    "status": "active"
+    "status": "Active",
+    "status_code": "active"
   }
 ]
 ```
+
+> **Note:** the `status` field is localized (EN `Active` / `Recent` / `Inactive`, RU `Активен` / `Недавно` / `Неактивен`) and is meant for humans. For automation, use the machine-stable `status_code` field - it does not depend on the script language and takes values from a fixed set: `active` (handshake < 3 min), `recent` (< 24 h), `inactive` (stats: no or stale handshake), `no_handshake` (list: no or stale handshake), `key_error` (list: client key not found in the server config), `no_data` (list: not enough data). The `status_code` field is present in both `list --json` and `stats --json`.
 
 ---
 
@@ -1174,6 +1178,8 @@ Starting with v5.9.0, the installer works on ARM systems alongside x86_64.
 1. The installer detects the kernel version and architecture automatically.
 2. If a prebuilt `amneziawg.ko` package matching your kernel exists in the [arm-packages release](https://github.com/bivlked/amneziawg-installer/releases/tag/arm-packages), it is downloaded and installed via `dpkg`. This takes 2-3 minutes.
 3. If no prebuilt package matches, the installer falls back to DKMS compilation from source. This works on any kernel but takes longer (10-30 min depending on hardware).
+
+> **Prebuilt ARM coverage:** prebuilt packages are built for Raspberry Pi (3/4/5), Ubuntu 24.04/25.10 ARM64 and Debian 12/13 ARM64. Ubuntu 26.04 ARM64 has no prebuilt yet - the module is built from source via DKMS (slower on first install, then works normally).
 
 **Raspberry Pi kernel detection:**
 

@@ -8,14 +8,14 @@ fi
 # ==============================================================================
 # AmneziaWG 2.0 installation and configuration script for Ubuntu/Debian servers
 # Author: @bivlked
-# Version: 5.15.5
-# Date: 2026-06-07
+# Version: 5.15.6
+# Date: 2026-06-08
 # Repository: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 
 # --- Safe mode and Constants ---
 set -o pipefail
-SCRIPT_VERSION="5.15.5"
+SCRIPT_VERSION="5.15.6"
 
 AWG_DIR="/root/awg"
 CONFIG_FILE="$AWG_DIR/awgsetup_cfg.init"
@@ -33,8 +33,8 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Verified in step5_download_scripts() after curl.
 # Verification is skipped when AWG_BRANCH is overridden (test branch).
 # Format: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="ee36a1449cc93252ee62f8868ec9dbd48ff3ee2885d4546ae5fcbf8102c87d5a"
-MANAGE_SCRIPT_SHA256="d8be0d16a1fed5426cf1f22b47721c13d25208953ef99ad0431ad1413ae75380"
+COMMON_SCRIPT_SHA256="e444e54f4156895483cb5fc8c57d505fd3d341e6d5c62b851c818cdd6c33a327"
+MANAGE_SCRIPT_SHA256="6d1149ed4edfec4e3961d3a8641b14c4799adfa0109584049b28f5b7dda4757a"
 
 # CLI flags
 UNINSTALL=0; HELP=0; HELP_EXIT_RC=0; DIAGNOSTIC=0; VERBOSE=0; NO_COLOR=0; AUTO_YES=0; NO_TWEAKS=0
@@ -46,13 +46,27 @@ CLI_ALLOW_IPV6_TUNNEL=0
 
 # --- Auto-cleanup of temporary files ---
 _install_temp_files=()
+_install_cleaned=0
 _install_cleanup() {
+    # Idempotent: on INT/TERM it is called from the signal handler, then again on
+    # EXIT - the second call must be a no-op.
+    [[ "$_install_cleaned" -eq 1 ]] && return 0
+    _install_cleaned=1
     local f
     for f in "${_install_temp_files[@]}"; do [[ -f "$f" ]] && rm -f "$f"; done
     # Clean up temporary files from awg_common.sh (if already sourced)
     type _awg_cleanup &>/dev/null && _awg_cleanup
 }
-trap _install_cleanup EXIT INT TERM
+# On INT/TERM the cleanup used to run but the script did NOT exit - execution
+# continued past the interrupted command (dangerous mid apt/dpkg/config edits)
+# and cleanup ran again on EXIT. A signal now means cleanup + explicit 130/143.
+_install_on_signal() {
+    _install_cleanup
+    exit "$1"
+}
+trap _install_cleanup EXIT
+trap '_install_on_signal 130' INT
+trap '_install_on_signal 143' TERM
 
 # --- Argument processing ---
 while [[ $# -gt 0 ]]; do
@@ -269,12 +283,13 @@ Options:
   --route-all           Use 'All traffic' mode non-interactively
   --route-amnezia       Use 'Amnezia' mode non-interactively
   --route-custom=NETS   Use 'Custom' mode non-interactively
-  --endpoint=IP         Specify external server IP (for servers behind NAT)
+  --endpoint=ADDR       External server endpoint: FQDN, IPv4 or [IPv6] (NAT)
   -y, --yes             Auto-confirm (reboots, UFW, etc.)
   -f, --force           Force reinstall on top of an already-running AmneziaWG
                         (by default a run on a configured server aborts;
                         ENV: AWG_FORCE_REINSTALL=1 is equivalent to the flag)
-  --no-tweaks           Skip hardening/optimization (no UFW, Fail2Ban, sysctl tweaks)
+  --no-tweaks           Skip optional hardening/optimization (UFW, Fail2Ban);
+                        the minimal forwarding sysctl is always applied
   --preset=TYPE         Obfuscation parameter preset: default, mobile
                         mobile: Jc=3, narrow Jmax — for mobile carriers (Tele2, Yota, Megafon)
   --jc=N               Set Jc manually (1-128, overrides preset)

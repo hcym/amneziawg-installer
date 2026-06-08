@@ -89,7 +89,12 @@ Also confirm by hand before tagging:
 - The README version badge, `SCRIPT_VERSION`, and the newest changelog heading
   all agree.
 - Ubuntu / Debian support matrix is current everywhere it is stated (README,
-  installer `--help`, issue template).
+  installer `--help`, issue template). When adding a new OS version, decide its
+  ARM story explicitly: either add a prebuilt target (an `arm-build.yml` matrix
+  entry plus the mapping in `_try_install_prebuilt_arm`) or keep it DKMS-only and
+  document that in INSTALL_VPS.md / ADVANCED. `check-docs-consistency.sh` fails
+  if a supported Ubuntu version has no ARM prebuilt target and is not marked
+  DKMS-only (e.g. Ubuntu 26.04 ARM64 is DKMS-only today).
 - The public roadmap issue
   ([#79](https://github.com/bivlked/amneziawg-installer/issues/79)) reflects the
   release: shipped items move to "Recently shipped" and leave the plan sections,
@@ -123,10 +128,20 @@ A tag push (`git push origin vX.Y.Z`) triggers two independent workflows:
   recording the installer tag, the exact upstream commit, the kernel version and
   the SHA256, so the mutable `arm-packages` assets stay auditable.
 
-The release is not finished until both runs are green. After they are, open the
-rendered README on GitHub and confirm the install and update one-liners point at
-the new tag - a final guard against a stale raw-URL slipping past the automated
-check.
+The release is not finished until both runs are green. Then run this post-publish
+health check:
+
+- The Releases page shows the new tag as "Latest", and that tag equals
+  `SCRIPT_VERSION` and the README version badge.
+- The `arm-packages` release was refreshed by `arm-build.yml` (its assets carry
+  the new installer tag in their `.manifest.json`).
+- Open the rendered README on GitHub and confirm the install and update
+  one-liners point at the new tag - a final guard against a stale raw-URL
+  slipping past the automated check.
+
+Note: `release.yml` only depends on the preflight gate, so the GitHub Release can
+appear before `arm-build.yml` finishes. For a release that advertises ARM
+prebuilt packages, wait for the ARM run to go green before announcing.
 
 If the preflight gate fails on a pushed tag, the release is not published.
 Delete the tag (`git push origin :refs/tags/vX.Y.Z` and `git tag -d vX.Y.Z`),

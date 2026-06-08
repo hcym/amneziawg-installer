@@ -8,15 +8,15 @@ fi
 # ==============================================================================
 # Скрипт для установки и настройки AmneziaWG 2.0 на Ubuntu/Debian серверах
 # Автор: @bivlked
-# Версия: 5.15.5
-# Дата: 2026-06-07
+# Версия: 5.15.6
+# Дата: 2026-06-08
 # Репозиторий: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 
 # --- Безопасный режим и Константы ---
 set -o pipefail
 
-SCRIPT_VERSION="5.15.5"
+SCRIPT_VERSION="5.15.6"
 AWG_DIR="/root/awg"
 CONFIG_FILE="$AWG_DIR/awgsetup_cfg.init"
 STATE_FILE="$AWG_DIR/setup_state"
@@ -33,8 +33,8 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Проверяются в step5_download_scripts() после curl.
 # Если AWG_BRANCH переопределён (не v$SCRIPT_VERSION), проверка пропускается.
 # Формат: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="e02f9b942b1586f5b11754575b67cce83136177c7891c1240f405c360833ec8a"
-MANAGE_SCRIPT_SHA256="b8733d20a3a29706953133339fbb56297dab3f8bd3fd0e9dda2631661176971b"
+COMMON_SCRIPT_SHA256="949f9414ead9d0855967e724d5ec7184a290d9e7df2354fcd9c19e7135ae513f"
+MANAGE_SCRIPT_SHA256="550086d35fc4e3661a37af657cbeb9ff867e91a54cd3b13b3fcc859b618eac2e"
 
 # Флаги CLI
 UNINSTALL=0; HELP=0; HELP_EXIT_RC=0; DIAGNOSTIC=0; VERBOSE=0; NO_COLOR=0; AUTO_YES=0; NO_TWEAKS=0
@@ -46,13 +46,27 @@ CLI_ALLOW_IPV6_TUNNEL=0
 
 # --- Автоочистка временных файлов ---
 _install_temp_files=()
+_install_cleaned=0
 _install_cleanup() {
+    # Идемпотентно: на INT/TERM зовётся из сигнального обработчика, затем ещё раз
+    # на EXIT - второй вызов должен быть no-op.
+    [[ "$_install_cleaned" -eq 1 ]] && return 0
+    _install_cleaned=1
     local f
     for f in "${_install_temp_files[@]}"; do [[ -f "$f" ]] && rm -f "$f"; done
     # Очистка временных файлов из awg_common.sh (если уже подключён через source)
     type _awg_cleanup &>/dev/null && _awg_cleanup
 }
-trap _install_cleanup EXIT INT TERM
+# На INT/TERM раньше cleanup срабатывал, но скрипт НЕ завершался - выполнение
+# продолжалось после прерванной команды (опасно посреди apt/dpkg/правки конфигов),
+# и cleanup ещё раз шёл на EXIT. Теперь сигнал = cleanup + явный выход 130/143.
+_install_on_signal() {
+    _install_cleanup
+    exit "$1"
+}
+trap _install_cleanup EXIT
+trap '_install_on_signal 130' INT
+trap '_install_on_signal 143' TERM
 
 # --- Обработка аргументов ---
 while [[ $# -gt 0 ]]; do
@@ -266,12 +280,13 @@ show_help() {
   --route-all           Использовать режим 'Весь трафик' неинтерактивно
   --route-amnezia       Использовать режим 'Amnezia' неинтерактивно
   --route-custom=СЕТИ   Использовать режим 'Пользовательский' неинтерактивно
-  --endpoint=IP         Указать внешний IP сервера (для серверов за NAT)
+  --endpoint=АДРЕС      Внешний endpoint сервера: FQDN, IPv4 или [IPv6] (для NAT)
   -y, --yes             Автоматическое подтверждение (перезагрузки, UFW и т.д.)
   -f, --force           Принудительная переустановка поверх уже работающего AmneziaWG
                         (по умолчанию запуск на сконфигурированном сервере прерывается;
                         ENV: AWG_FORCE_REINSTALL=1 эквивалентен флагу)
-  --no-tweaks           Пропустить hardening/оптимизацию (без UFW, Fail2Ban, sysctl tweaks)
+  --no-tweaks           Пропустить необязательный hardening/оптимизацию (UFW,
+                        Fail2Ban); минимальный forwarding-sysctl применяется всегда
   --preset=ТИП          Набор параметров обфускации: default, mobile
                         mobile: Jc=3, узкий Jmax — для мобильных операторов (Tele2, Yota, Megafon)
   --jc=N               Задать Jc вручную (1-128, поверх preset)

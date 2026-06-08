@@ -438,7 +438,7 @@ PersistentKeepalive = 33
   --route-all           Режим: Весь трафик (0.0.0.0/0)
   --route-amnezia       Режим: Список Amnezia+DNS (умолч.)
   --route-custom=СЕТИ   Режим: Только указанные сети
-  --endpoint=IP         Указать внешний IP (для серверов за NAT)
+  --endpoint=АДРЕС      Внешний endpoint сервера: FQDN, IPv4 или [IPv6] (для NAT)
   --preset=ТИП          Набор параметров обфускации: default, mobile
                         mobile: Jc=3, узкий Jmax — для мобильных операторов (Tele2, Yota, Мегафон)
   --jc=N                Задать Jc вручную (1-128, поверх preset)
@@ -446,7 +446,8 @@ PersistentKeepalive = 33
   --jmax=N              Задать Jmax вручную (0-1280, поверх preset, ≥ Jmin)
   -y, --yes             Неинтерактивный режим (все подтверждения auto-yes)
   -f, --force           Переустановка поверх работающего AWG (ENV: AWG_FORCE_REINSTALL=1)
-  --no-tweaks           Пропустить hardening/оптимизацию (без UFW, Fail2Ban, sysctl tweaks)
+  --no-tweaks           Пропустить необязательный hardening/оптимизацию (UFW,
+                        Fail2Ban); минимальный forwarding-sysctl применяется всегда
 ```
 
 <a id="manage-cli-adv"></a>
@@ -591,7 +592,7 @@ graph TD
 Инсталлятор скачивает `awg_common.sh` и `manage_amneziawg.sh` с URL, привязанных к конкретному тегу версии:
 
 ```
-https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/awg_common.sh
+https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/awg_common.sh
 ```
 
 Это даёт **supply chain pinning**: скачиваемые скрипты соответствуют версии инсталлятора, даже если `main` уже обновлён.
@@ -611,12 +612,12 @@ AWG_BRANCH=my-feature-branch sudo bash ./install_amneziawg.sh
 
 ```bash
 # Русская версия:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/manage_amneziawg.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/awg_common.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/manage_amneziawg.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/awg_common.sh
 
 # Английская версия:
-wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/manage_amneziawg_en.sh
-wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.5/awg_common_en.sh
+wget -O /root/awg/manage_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/manage_amneziawg_en.sh
+wget -O /root/awg/awg_common.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/awg_common_en.sh
 
 # Установить права
 chmod 700 /root/awg/manage_amneziawg.sh /root/awg/awg_common.sh
@@ -968,10 +969,13 @@ sudo bash /root/awg/manage_amneziawg.sh stats --json
     "rx": 1332477952,
     "tx": 374083174,
     "last_handshake": 1710312180,
-    "status": "active"
+    "status": "Активен",
+    "status_code": "active"
   }
 ]
 ```
+
+> **Примечание:** поле `status` локализовано (RU `Активен` / `Недавно` / `Неактивен`, EN `Active` / `Recent` / `Inactive`) и предназначено для человека. Для автоматизации используйте машинно-стабильное поле `status_code` - оно не зависит от языка скрипта и принимает значения из фиксированного набора: `active` (handshake < 3 мин), `recent` (< 24 ч), `inactive` (stats: handshake не было или давно), `no_handshake` (list: handshake не было или давно), `key_error` (list: ключ клиента не найден в конфиге сервера), `no_data` (list: недостаточно данных). Поле `status_code` присутствует и в `list --json`, и в `stats --json`.
 
 ---
 
@@ -1170,6 +1174,8 @@ apt-get update && apt-get install -y curl
 1. Инсталлятор определяет версию ядра и архитектуру автоматически.
 2. Если в [arm-packages release](https://github.com/bivlked/amneziawg-installer/releases/tag/arm-packages) есть готовый пакет `amneziawg.ko` для вашего ядра, он скачивается и устанавливается через `dpkg`. Это занимает 2-3 минуты.
 3. Если готовый пакет не подходит, инсталлятор переключается на DKMS-сборку из исходников. Работает с любым ядром, но занимает больше времени (10-30 мин в зависимости от оборудования).
+
+> **Покрытие готовыми ARM-пакетами:** prebuilt собираются для Raspberry Pi (3/4/5), Ubuntu 24.04/25.10 ARM64 и Debian 12/13 ARM64. Ubuntu 26.04 ARM64 пока без prebuilt - модуль собирается из исходников через DKMS (дольше при первой установке, дальше работает штатно).
 
 **Определение ядра Raspberry Pi:**
 

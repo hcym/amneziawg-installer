@@ -8,14 +8,14 @@ fi
 # ==============================================================================
 # Скрипт для управления пользователями (пирами) AmneziaWG 2.0
 # Автор: @bivlked
-# Версия: 5.15.5
-# Дата: 2026-06-07
+# Версия: 5.15.6
+# Дата: 2026-06-08
 # Репозиторий: https://github.com/bivlked/amneziawg-installer
 # ==============================================================================
 
 # --- Безопасный режим и Константы ---
 # shellcheck disable=SC2034
-SCRIPT_VERSION="5.15.5"
+SCRIPT_VERSION="5.15.6"
 set -o pipefail
 AWG_DIR="/root/awg"
 SERVER_CONF_FILE="/etc/amnezia/amneziawg/awg0.conf"
@@ -44,14 +44,29 @@ manage_mktempdir() {
     echo "$d"
 }
 
+_manage_cleaned=0
 _manage_cleanup() {
+    # Идемпотентно: на INT/TERM зовётся из сигнального обработчика, затем ещё раз
+    # на EXIT - повтор должен быть no-op.
+    [[ "$_manage_cleaned" -eq 1 ]] && return 0
+    _manage_cleaned=1
     local d
     for d in "${_manage_temp_dirs[@]}"; do
         [[ -d "$d" ]] && rm -rf "$d"
     done
     type _awg_cleanup &>/dev/null && _awg_cleanup
 }
-trap _manage_cleanup EXIT INT TERM
+# На INT/TERM раньше cleanup срабатывал, но скрипт НЕ завершался - выполнение шло
+# дальше после прерванной команды, и cleanup повторялся на EXIT. Теперь сигнал =
+# cleanup + явный выход 130/143. restore_backup на время destructive-фазы ставит
+# СВОЙ INT/TERM-обработчик (с откатом), затем снимает его в _restore_cleanup.
+_manage_on_signal() {
+    _manage_cleanup
+    exit "$1"
+}
+trap _manage_cleanup EXIT
+trap '_manage_on_signal 130' INT
+trap '_manage_on_signal 143' TERM
 
 # --- Обработка аргументов ---
 COMMAND=""
@@ -494,7 +509,12 @@ restore_backup() {
         # Реентранс невозможен: `local` и `trap -` не вызывают функций,
         # а после `trap - RETURN` наш trap уже снят.
         local _rc=$?
+        # Снимаем RETURN и ВОССТАНАВЛИВАЕМ глобальные INT/TERM (локальные хуки
+        # restore выставлены ниже). Просто `trap -` сбросил бы их в default и
+        # менеджер после restore потерял бы B1-поведение signal -> cleanup+exit.
         trap - RETURN
+        trap '_manage_on_signal 130' INT
+        trap '_manage_on_signal 143' TERM
         if [[ $_restore_ok -eq 0 && $_destructive_ops_started -eq 1 && -n "$_rollback_snap" ]]; then
             _restore_do_rollback "$_rollback_snap" || true
         fi
@@ -504,6 +524,13 @@ restore_backup() {
         return $_rc
     }
     trap _restore_cleanup RETURN
+    # INT/TERM в ходе restore: тот же rollback+cleanup, что и на обычном return
+    # (_restore_cleanup видит локальные _restore_ok/_rollback_snap/td), затем выход
+    # с сигнальным кодом. Перекрывает глобальный _manage_on_signal, чтобы прерывание
+    # destructive-фазы не оставило систему без отката. _restore_cleanup сам снимет
+    # эти хуки (trap - INT TERM выше).
+    trap '_restore_cleanup; exit 130' INT
+    trap '_restore_cleanup; exit 143' TERM
 
     log "Создание бэкапа текущей..."
     # --no-prune: выбранный для восстановления $bf лежит в той же папке бэкапов;
@@ -578,6 +605,17 @@ restore_backup() {
         return 1
     fi
 
+    # Проверка полноты бэкапа ДО остановки сервиса. Бэкап без серверного конфига
+    # бесполезен (VPN без него не поднять), а пустой server/ ронял `cp "$td/server/"*`
+    # уже ПОСЛЕ stop и форсил откат рабочей системы. Проверяем до destructive-фазы:
+    # сервис не трогаем, откат не нужен.
+    local _srv_base
+    _srv_base=$(basename "$SERVER_CONF_FILE")
+    if [[ ! -f "$td/server/$_srv_base" ]]; then
+        log_error "Бэкап неполный: отсутствует серверный конфиг ($_srv_base) - восстановление отменено."
+        return 1
+    fi
+
     log "Остановка сервиса..."
     systemctl stop awg-quick@awg0 || log_warn "Сервис не остановлен."
 
@@ -604,15 +642,22 @@ restore_backup() {
         # orphan .conf/.png/.vpnuri). Scope строго managed client-globs - НЕ
         # трогаю скрипты, server-ключи, backups/, логи, .lock, awgsetup_cfg.init.
         rm -f "$AWG_DIR"/*.conf "$AWG_DIR"/*.png "$AWG_DIR"/*.vpnuri 2>/dev/null || true
-        if ! cp -a "$td/clients/"* "$AWG_DIR/"; then
-            log_error "Ошибка копирования clients — восстановление прервано (запуск отката)."
-            return 1
+        # Пустой clients/ - валидный случай (сервер без клиентских конфигов):
+        # prune выше уже дал чистую замену, copy просто пропускаем (без compgen
+        # голый glob "$td/clients/"* остался бы литералом и уронил cp -> откат).
+        if compgen -G "$td/clients/*" > /dev/null; then
+            if ! cp -a "$td/clients/"* "$AWG_DIR/"; then
+                log_error "Ошибка копирования clients — восстановление прервано (запуск отката)."
+                return 1
+            fi
+            chmod 600 "$AWG_DIR"/*.conf 2>/dev/null
+            chmod 600 "$AWG_DIR"/*.png 2>/dev/null
+            chmod 600 "$AWG_DIR"/*.vpnuri 2>/dev/null
+            chmod 600 "$CONFIG_FILE" 2>/dev/null
+            log_debug "Файлы клиентов восстановлены в $AWG_DIR"
+        else
+            log_debug "Бэкап без клиентских файлов (clients/ пуст) - пропуск копирования."
         fi
-        chmod 600 "$AWG_DIR"/*.conf 2>/dev/null
-        chmod 600 "$AWG_DIR"/*.png 2>/dev/null
-        chmod 600 "$AWG_DIR"/*.vpnuri 2>/dev/null
-        chmod 600 "$CONFIG_FILE" 2>/dev/null
-        log_debug "Файлы клиентов восстановлены в $AWG_DIR"
     fi
 
     if [[ -d "$td/keys" ]]; then
@@ -712,10 +757,37 @@ modify_client() {
 
     case "$param" in
         DNS)
-            if ! [[ "$value" =~ ^[0-9a-fA-F.:,\ ]+$ ]]; then
-                log_error "Невалидный DNS: '$value' (допустимы IP-адреса через запятую)"
-                return 1
-            fi ;;
+            # Структурная проверка списка DNS. Старый charset-only regex
+            # ^[0-9a-fA-F.:,\ ]+$ пропускал мусор ('abc' - буквы a-f; '999.999.999.999' -
+            # вне диапазона). DNS по контракту - только IP через запятую (без FQDN),
+            # поэтому каждый элемент = bare IPv4 или IPv6, как у Endpoint/AllowedIPs.
+            case "$value" in
+                *$'\n'*|*$'\r'*|*\\*|*\"*|*\'*|"")
+                    log_error "Невалидный DNS: '$value'"
+                    return 1 ;;
+            esac
+            case "$value" in
+                ,*|*,|*,,*)
+                    log_error "Невалидный DNS '$value': пустой элемент списка (лишняя запятая)"
+                    return 1 ;;
+            esac
+            local _dns_tok _dns_ifs="$IFS"
+            IFS=','
+            for _dns_tok in $value; do
+                _dns_tok="${_dns_tok//[[:space:]]/}"
+                if [[ -z "$_dns_tok" ]]; then
+                    IFS="$_dns_ifs"
+                    log_error "Невалидный DNS '$value': пустой элемент списка (лишняя запятая)"
+                    return 1
+                fi
+                if ! _valid_ipv4 "$_dns_tok" && ! _valid_ipv6 "$_dns_tok"; then
+                    IFS="$_dns_ifs"
+                    log_error "Невалидный DNS '$value': '$_dns_tok' не похож на IPv4/IPv6-адрес"
+                    return 1
+                fi
+            done
+            IFS="$_dns_ifs"
+            ;;
         PersistentKeepalive)
             if ! [[ "$value" =~ ^[0-9]+$ ]] || [[ "$value" -gt 65535 ]]; then
                 log_error "Невалидный PersistentKeepalive: '$value' (допустимо: 0-65535)"
@@ -1208,7 +1280,7 @@ list_clients() {
         if [[ -z "$name" ]]; then continue; fi
         ((tot++))
 
-        local cf="?" png="?" pk="-" ip="-" ip6="-" st="Нет данных"
+        local cf="?" png="?" pk="-" ip="-" ip6="-" st="Нет данных" st_code="no_data"
         local color_start="" color_end=""
         if [[ "$NO_COLOR" -eq 0 ]]; then
             color_end="\033[0m"
@@ -1249,24 +1321,24 @@ list_clients() {
                 if [[ "$handshake" =~ ^[0-9]+$ && "$handshake" -gt 0 ]]; then
                     local diff=$((now - handshake))
                     if [[ $diff -lt 180 ]]; then
-                        st="Активен"
+                        st="Активен"; st_code="active"
                         [[ "$NO_COLOR" -eq 0 ]] && color_start="\033[0;32m"
                         ((act++))
                     elif [[ $diff -lt 86400 ]]; then
-                        st="Недавно"
+                        st="Недавно"; st_code="recent"
                         [[ "$NO_COLOR" -eq 0 ]] && color_start="\033[0;33m"
                         ((act++))
                     else
-                        st="Нет handshake"
+                        st="Нет handshake"; st_code="no_handshake"
                         [[ "$NO_COLOR" -eq 0 ]] && color_start="\033[0;37m"
                     fi
                 else
-                    st="Нет handshake"
+                    st="Нет handshake"; st_code="no_handshake"
                     [[ "$NO_COLOR" -eq 0 ]] && color_start="\033[0;37m"
                 fi
             else
                 pk="?"
-                st="Ошибка ключа"
+                st="Ошибка ключа"; st_code="key_error"
                 [[ "$NO_COLOR" -eq 0 ]] && color_start="\033[0;31m"
             fi
         fi
@@ -1282,7 +1354,7 @@ list_clients() {
         if [[ "$JSON_OUTPUT" -eq 1 ]]; then
             local _ip6_val="${ip6}"
             [[ "$_ip6_val" == "-" ]] && _ip6_val=""
-            json_entries+=("{\"name\":\"$(json_escape "$name")\",\"ip\":\"$(json_escape "$ip")\",\"client_ipv6\":\"$(json_escape "$_ip6_val")\",\"status\":\"$(json_escape "$st")\"}")
+            json_entries+=("{\"name\":\"$(json_escape "$name")\",\"ip\":\"$(json_escape "$ip")\",\"client_ipv6\":\"$(json_escape "$_ip6_val")\",\"status\":\"$(json_escape "$st")\",\"status_code\":\"${st_code}\"}")
         elif [[ $verbose -eq 1 ]]; then
             local ip_display
             if [[ "$ip6" != "-" ]]; then
@@ -1384,15 +1456,15 @@ stats_clients() {
         fi
 
         local hs_str="никогда"
-        local status="Неактивен"
+        local status="Неактивен" status_code="inactive"
         if [[ "$handshake" =~ ^[0-9]+$ && "$handshake" -gt 0 ]]; then
             local now
             now=$(date +%s)
             local diff=$((now - handshake))
             if [[ $diff -lt 180 ]]; then
-                status="Активен"
+                status="Активен"; status_code="active"
             elif [[ $diff -lt 86400 ]]; then
-                status="Недавно"
+                status="Недавно"; status_code="recent"
             fi
             hs_str=$(date -d "@$handshake" '+%F %T' 2>/dev/null || echo "$handshake")
         fi
@@ -1401,7 +1473,7 @@ stats_clients() {
         total_tx=$((total_tx + tx))
 
         if [[ "$JSON_OUTPUT" -eq 1 ]]; then
-            json_entries+=("{\"name\":\"$(json_escape "$cname")\",\"ip\":\"$(json_escape "$ip")\",\"rx\":$rx,\"tx\":$tx,\"last_handshake\":$handshake,\"status\":\"$(json_escape "$status")\"}")
+            json_entries+=("{\"name\":\"$(json_escape "$cname")\",\"ip\":\"$(json_escape "$ip")\",\"rx\":$rx,\"tx\":$tx,\"last_handshake\":$handshake,\"status\":\"$(json_escape "$status")\",\"status_code\":\"${status_code}\"}")
         else
             local rx_h tx_h
             rx_h=$(format_bytes "$rx")
@@ -1516,6 +1588,15 @@ case $COMMAND in
             log "PresharedKey будет сгенерирован для каждого нового клиента (--psk)."
         fi
 
+        # --expires валидируем ОДИН раз ДО создания первого клиента. Иначе при
+        # неверном формате (--expires=bad) клиенты создавались permanent, а
+        # set_client_expiry молча падал per-client - временный клиент незаметно
+        # становился постоянным. Плохой формат теперь рушит команду до изменений.
+        if [[ -n "$EXPIRES_DURATION" ]]; then
+            parse_duration "$EXPIRES_DURATION" >/dev/null \
+                || die "Некорректный --expires='$EXPIRES_DURATION'. Используйте: 1h, 12h, 1d, 7d, 4w."
+        fi
+
         _added=0
         for _cname in "${ARGS[@]}"; do
             validate_client_name "$_cname" || { _cmd_rc=1; continue; }
@@ -1540,7 +1621,13 @@ case $COMMAND in
                 fi
                 if [[ -n "$EXPIRES_DURATION" ]]; then
                     if set_client_expiry "$_cname" "$EXPIRES_DURATION"; then
-                        install_expiry_cron
+                        install_expiry_cron || { log_error "Клиент '$_cname' создан со сроком, но cron автоудаления НЕ установлен - истёкший клиент сам не удалится."; _cmd_rc=1; }
+                    else
+                        # Формат проверен выше, значит сбой записи expiry (FS/права).
+                        # Клиент создан и рабочий, но БЕЗ авто-срока - сигналим явно,
+                        # чтобы временный клиент не остался незаметно постоянным.
+                        log_error "Клиент '$_cname' создан, но срок действия НЕ установлен (ошибка записи expiry). Клиент постоянный - задайте срок повторно или удалите."
+                        _cmd_rc=1
                     fi
                 fi
                 ((_added++))
@@ -1604,9 +1691,7 @@ case $COMMAND in
             for _rname in "${_valid_names[@]}"; do
                 log "Удаление '$_rname'..."
                 if remove_peer_from_server "$_rname"; then
-                    rm -f "$AWG_DIR/$_rname.conf" "$AWG_DIR/$_rname.png" \
-                        "$AWG_DIR/$_rname.vpnuri" "$AWG_DIR/$_rname.vpnuri.png"
-                    rm -f "$KEYS_DIR/${_rname}.private" "$KEYS_DIR/${_rname}.public"
+                    _remove_client_files "$_rname"
                     remove_client_expiry "$_rname"
                     log "Клиент '$_rname' удалён."
                     ((_removed++))
