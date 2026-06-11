@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AmneziaWG 2.0 VPN на свой сервер одной командой</title>
+<meta name="description" content="Установка self-hosted AmneziaWG 2.0 VPN на чистый VPS с Ubuntu или Debian одной командой. Обход DPI, защита сервера и управление клиентами. Лицензия MIT.">
+<link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/">
+<link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/">
+<link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/">
+<link rel="alternate" hreflang="x-default" href="https://bivlked.github.io/amneziawg-installer/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="AmneziaWG 2.0 VPN на свой сервер одной командой">
+<meta property="og:description" content="Одна команда превращает чистый VPS с Ubuntu или Debian в устойчивый к DPI VPN-сервер AmneziaWG 2.0. Открытый код, лицензия MIT.">
+<meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/ru/">
+<meta property="og:site_name" content="amneziawg-installer">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="amneziawg-installer - VPN-сервер AmneziaWG 2.0 одной командой">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta name="twitter:title" content="AmneziaWG 2.0 VPN на свой сервер одной командой">
+<meta name="twitter:description" content="Одна команда превращает чистый VPS с Ubuntu или Debian в устойчивый к DPI VPN-сервер AmneziaWG 2.0. Открытый код, лицензия MIT.">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "amneziawg-installer",
+  "description": "Установщик и набор скриптов управления для self-hosted VPN AmneziaWG 2.0 на серверах Ubuntu и Debian, в одну команду.",
+  "applicationCategory": "SecurityApplication",
+  "operatingSystem": "Ubuntu 24.04, Ubuntu 25.10, Ubuntu 26.04, Debian 12, Debian 13",
+  "license": "https://opensource.org/licenses/MIT",
+  "codeRepository": "https://github.com/bivlked/amneziawg-installer",
+  "url": "https://bivlked.github.io/amneziawg-installer/ru/",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "author": { "@type": "Person", "name": "bivlked" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Это бесплатно?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Установщик с открытым кодом под лицензией MIT. Платите только за VPS, а он стоит примерно от 3 до 5 долларов в месяц." } },
+    { "@type": "Question", "name": "Нужны ли знания Linux?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Вы вставляете одну команду в SSH-сессию на чистом VPS с Ubuntu или Debian. Скрипт сам ставит модуль ядра, настраивает firewall и форвардинг, создаёт первого клиента и печатает QR-код и vpn-ссылку для Amnezia Client." } },
+    { "@type": "Question", "name": "Какой VPS выбрать?", "acceptedAnswer": { "@type": "Answer", "text": "Чистый VPS с Ubuntu или Debian, 1 vCPU и от 512 МБ памяти. Скрипт рассчитан на отдельный VPS, а не на домашний роутер или shared-хостинг." } },
+    { "@type": "Question", "name": "Обходит ли DPI и блокировки?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 добавляет обфускацию поверх WireGuard и сопротивляется DPI, который применяют ТСПУ в России, а также в Иране, Китае и в школьных и корпоративных сетях. Гарантии против каждого оператора нет, но протокол даёт настройки обфускации, которые проходят сегодня." } },
+    { "@type": "Question", "name": "Работает ли на ARM и Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Готовые модули ядра ARM64 покрывают Raspberry Pi 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный автоматически." } }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/amneziawg-installer/ru/">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3ddc97"/><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/></svg>
+      amneziawg-installer
+    </a>
+    <nav class="nav-right" aria-label="Навигация по сайту">
+      <span class="lang-switch"><a href="/amneziawg-installer/">EN</a><a class="active" aria-current="page" href="/amneziawg-installer/ru/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Звезда на GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero" style="border-top:none">
+  <div class="wrap">
+    <h1>Свой VPN-сервер AmneziaWG 2.0 одной командой</h1>
+    <p class="lede">Превратите чистый VPS с Ubuntu или Debian в self-hosted VPN с обходом DPI и блокировок. Без Docker, без веб-панели, без знаний Linux.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#quick-start">Быстрый старт</a>
+      <a class="btn" href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Полный гайд</a>
+      <a class="btn" href="https://github.com/bivlked/amneziawg-installer">GitHub</a>
+    </div>
+    <div class="cmd">
+      <button class="copy-btn" data-copy="wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/install_amneziawg.sh&#10;chmod +x install_amneziawg.sh&#10;sudo bash ./install_amneziawg.sh">Копировать</button>
+      <pre><span class="prompt">$ </span>wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.15.6/install_amneziawg.sh
+<span class="prompt">$ </span>chmod +x install_amneziawg.sh
+<span class="prompt">$ </span>sudo bash ./install_amneziawg.sh</pre>
+    </div>
+    <p class="inline-note">Берите актуальную версию со <a href="https://github.com/bivlked/amneziawg-installer/releases">страницы релизов</a>. Три команды, две перезагрузки, около двадцати минут до готового VPN.</p>
+    <div class="trust">
+      <span>Лицензия MIT</span>
+      <span>Ubuntu и Debian</span>
+      <span>x86_64 и ARM64</span>
+      <span>Без зависимостей в рантайме</span>
+    </div>
+  </div>
+</section>
+
+<section id="what">
+  <div class="wrap">
+    <h2>Что это даёт</h2>
+    <p class="sub">AmneziaWG - это WireGuard с обфускацией трафика, поэтому для DPI handshake уже не выглядит как обычный VPN. Скрипт настраивает весь сервер за вас.</p>
+    <p>Вы даёте команду свежему VPS по SSH. Она ставит модуль ядра AmneziaWG 2.0 через DKMS, закрывает firewall, включает форвардинг, оптимизирует систему под одну задачу и создаёт первого клиента. В конце вы получаете QR-код и vpn-ссылку для импорта в Amnezia Client в одно касание. Добавить ещё устройство потом - одна команда.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Возможности</h2>
+    <p class="sub">Всё, что нужно небольшому VPN-серверу, с разумными настройками по умолчанию и без правки конфигов вручную.</p>
+    <div class="grid">
+      <div class="card"><div class="ico" aria-hidden="true">&#128272;</div><h3>Обход DPI</h3><p>Полная обфускация AmneziaWG 2.0: мусорные пакеты, маскировка заголовков (H1-H4), паддинг (S1-S4) и пакеты сокрытия I1-I5.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128737;</div><h3>Защита по умолчанию</h3><p>Firewall UFW с deny-all и лимитом на SSH, Fail2Ban, строгие права на файлы и hardening через sysctl.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128241;</div><h3>Управление клиентами</h3><p>Добавление, удаление, список и перегенерация. QR-коды, vpn-ссылки для импорта в одно касание и гостевые конфиги с датой истечения.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#127760;</div><h3>IPv6 dual-stack</h3><p>Опциональная двухстековая маршрутизация, по умолчанию выключена и включается одним флагом, когда нужно.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128421;</div><h3>ARM и Raspberry Pi</h3><p>Готовые модули ядра для Raspberry Pi 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128260;</div><h3>Переживает перезагрузки</h3><p>Машина состояний с возобновлением после ребута и авто-починка DKMS, которая пересобирает модуль после обновления ядра.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="quick-start">
+  <div class="wrap">
+    <h2>Быстрый старт</h2>
+    <p class="sub">От чистого VPS до работающего VPN за три шага.</p>
+    <div class="steps">
+      <div class="step"><span class="n"></span><p>Арендуйте чистый VPS с Ubuntu или Debian и подключитесь по SSH под root.</p></div>
+      <div class="step"><span class="n"></span><p>Запустите команду выше. Скрипт сам перезагрузит сервер, когда нужно. После ребута запустите её снова - она продолжит с того места, где остановилась.</p></div>
+      <div class="step"><span class="n"></span><p>Отсканируйте QR-код или откройте vpn-ссылку в Amnezia Client. Готово, вы подключены.</p></div>
+    </div>
+    <p class="inline-note mt">Для автоматизации тот же скрипт принимает <code>--yes --route-all</code> и любой другой параметр флагом. <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Полный гайд</a> покрывает выбор VPS, нюансы ARM, troubleshooting и удаление.</p>
+  </div>
+</section>
+
+<section id="os">
+  <div class="wrap">
+    <h2>Поддерживаемые системы</h2>
+    <p class="sub">Проверено на чистых минимальных серверных установках. Обновления ядра обрабатываются автоматически через DKMS.</p>
+    <div class="os-list">
+      <span class="pill"><b>Ubuntu</b> 24.04 LTS</span>
+      <span class="pill"><b>Ubuntu</b> 25.10 и 26.04</span>
+      <span class="pill"><b>Debian</b> 12 bookworm</span>
+      <span class="pill"><b>Debian</b> 13 trixie</span>
+    </div>
+    <p class="inline-note mt">Рассчитано на скромный бюджет: 1 vCPU, от 512 МБ памяти, 5 ГБ диска. И amd64, и arm64.</p>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Почему обычный bash-скрипт</h2>
+    <p class="sub">Работает как модуль ядра, и между вами и туннелем нет ничего лишнего.</p>
+    <p>Веб-панель оправдана только если вы постоянно заводите и меняете клиентов. У большинства VPN-сервер настраивается один раз и забывается, так что bash-подход держит след минимальным и спокойно работает на самом дешёвом VPS. Модуль в ядре быстрее, чем туннель в userspace, и нет ничего лишнего, что нужно патчить. Если вам всё же хочется UI или другой компромисс - в <a href="https://github.com/bivlked/amneziawg-installer#similar-tools">сравнении в README</a> честно написано, когда другой инструмент подойдёт лучше.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Частые вопросы</h2>
+    <div class="faq">
+      <details><summary>Это бесплатно?</summary><div class="answer">Да. Установщик с открытым кодом под лицензией MIT. Платите только за VPS - от 3 до 5 долларов в месяц.</div></details>
+      <details><summary>Нужны ли знания Linux?</summary><div class="answer">Нет. Вы вставляете одну команду в SSH на чистом VPS. Скрипт сам ставит модуль ядра, настраивает firewall и форвардинг, создаёт первого клиента и печатает QR-код и vpn-ссылку.</div></details>
+      <details><summary>Какой VPS выбрать?</summary><div class="answer">Чистый VPS с Ubuntu или Debian, 1 vCPU и от 512 МБ памяти. Скрипт рассчитан на отдельный VPS, а не на домашний роутер или shared-хостинг.</div></details>
+      <details><summary>Обходит ли DPI и блокировки?</summary><div class="answer">AmneziaWG 2.0 добавляет обфускацию поверх WireGuard и сопротивляется DPI, который применяют ТСПУ в России, а также в Иране, Китае и в школьных и корпоративных сетях. Гарантии против каждого оператора нет, но протокол даёт настройки обфускации, которые проходят сегодня.</div></details>
+      <details><summary>Работает ли на ARM и Raspberry Pi?</summary><div class="answer">Да. Готовые модули ARM64 покрывают Raspberry Pi 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный.</div></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="foot-links">
+          <a href="https://github.com/bivlked/amneziawg-installer">Репозиторий</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Гайд по установке</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.md">Расширенно</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CHANGELOG.md">Изменения</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/LICENSE">Лицензия</a>
+        </div>
+        <p class="note">Открытый код под лицензией MIT. Если проект пригодился, звезда на GitHub помогает другим его найти.</p>
+      </div>
+      <div class="lang-switch"><a href="/amneziawg-installer/">EN</a> <a class="active" aria-current="page" href="/amneziawg-installer/ru/">RU</a></div>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll(".copy-btn").forEach(function (b) {
+  b.addEventListener("click", function () {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(b.getAttribute("data-copy")).then(function () {
+      var t = b.textContent; b.textContent = "Скопировано"; setTimeout(function () { b.textContent = t; }, 1500);
+    }).catch(function () {});
+  });
+});
+</script>
+</body>
+</html>
