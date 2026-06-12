@@ -14,7 +14,7 @@
   --maxw: 960px;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
   background: var(--bg);
@@ -58,7 +58,10 @@ code, pre, kbd { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Co
 .btn-sm { padding: 7px 13px; font-size: 14px; }
 
 /* hero */
-.hero { padding: 64px 0 40px; text-align: center; }
+.hero {
+  padding: 64px 0 40px; text-align: center; border-top: none;
+  background: radial-gradient(ellipse 70% 55% at 50% 0%, rgba(61, 220, 151, 0.07), transparent 70%);
+}
 .hero h1 { font-size: clamp(30px, 5vw, 46px); margin: 0 0 14px; letter-spacing: -0.5px; }
 .hero .lede { font-size: clamp(17px, 2.4vw, 21px); color: var(--text-dim); max-width: 640px; margin: 0 auto 26px; }
 .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
@@ -90,13 +93,17 @@ section .sub { color: var(--text-dim); margin: 0 0 26px; max-width: 660px; }
 
 /* feature grid */
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+.card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;
+  transition: transform .08s ease, border-color .15s ease;
+}
+.card:hover { border-color: var(--accent-dim); transform: translateY(-2px); }
 .card .ico { font-size: 26px; line-height: 1; margin-bottom: 10px; }
 .card h3 { font-size: 17px; margin: 0 0 6px; }
 .card p { margin: 0; color: var(--text-dim); font-size: 15px; }
 
 /* steps */
-.steps { counter-reset: step; display: grid; gap: 14px; }
+.steps { counter-reset: step; display: grid; gap: 14px; list-style: none; margin: 0; padding: 0; }
 .step { display: flex; gap: 14px; align-items: flex-start; }
 .step .n {
   counter-increment: step; flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
@@ -114,6 +121,7 @@ section .sub { color: var(--text-dim); margin: 0 0 26px; max-width: 660px; }
 /* faq */
 .faq details { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; padding: 0 18px; }
 .faq summary { cursor: pointer; padding: 15px 0; font-weight: 600; list-style: none; }
+.faq summary:hover { color: var(--accent); }
 .faq summary::-webkit-details-marker { display: none; }
 .faq summary::after { content: "+"; float: right; color: var(--accent); font-weight: 700; }
 .faq details[open] summary::after { content: "\2212"; }
@@ -132,3 +140,24 @@ section .sub { color: var(--text-dim); margin: 0 0 26px; max-width: 660px; }
 .center { text-align: center; }
 .mt { margin-top: 26px; }
 .inline-note { color: var(--text-dim); font-size: 14.5px; margin-top: 12px; }
+
+/* polish */
+::selection { background: var(--accent); color: var(--accent-ink); }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* compact header on small screens */
+@media (max-width: 600px) {
+  .brand { font-size: 15px; }
+  .nav-right { gap: 8px; }
+  .btn-sm { padding: 6px 10px; font-size: 13px; }
+}
+@media (max-width: 430px) {
+  .site-header .btn-sm { display: none; }
+}
+
+/* reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .btn, .card { transition: none; }
+  .btn:hover, .card:hover { transform: none; }
+}

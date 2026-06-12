@@ -24,7 +24,10 @@
 <meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
 <meta name="twitter:title" content="AmneziaWG 2.0 VPN на свой сервер одной командой">
 <meta name="twitter:description" content="Одна команда превращает чистый VPS с Ubuntu или Debian в устойчивый к DPI VPN-сервер AmneziaWG 2.0. Открытый код, лицензия MIT.">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
 <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
 <link rel="stylesheet" href="../assets/style.css">
 <script type="application/ld+json">
 {
@@ -46,11 +49,12 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    { "@type": "Question", "name": "Это бесплатно?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Установщик с открытым кодом под лицензией MIT. Платите только за VPS, а он стоит примерно от 3 до 5 долларов в месяц." } },
-    { "@type": "Question", "name": "Нужны ли знания Linux?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Вы вставляете одну команду в SSH-сессию на чистом VPS с Ubuntu или Debian. Скрипт сам ставит модуль ядра, настраивает firewall и форвардинг, создаёт первого клиента и печатает QR-код и vpn-ссылку для Amnezia Client." } },
+    { "@type": "Question", "name": "Это бесплатно?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Установщик с открытым кодом под лицензией MIT. Платите только за VPS - от 3 до 5 долларов в месяц." } },
+    { "@type": "Question", "name": "Нужны ли знания Linux?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Вы вставляете одну команду в SSH на чистом VPS. Скрипт сам ставит модуль ядра, настраивает firewall и форвардинг, создаёт первого клиента и печатает QR-код и vpn-ссылку." } },
     { "@type": "Question", "name": "Какой VPS выбрать?", "acceptedAnswer": { "@type": "Answer", "text": "Чистый VPS с Ubuntu или Debian, 1 vCPU и от 512 МБ памяти. Скрипт рассчитан на отдельный VPS, а не на домашний роутер или shared-хостинг." } },
     { "@type": "Question", "name": "Обходит ли DPI и блокировки?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 добавляет обфускацию поверх WireGuard и сопротивляется DPI, который применяют ТСПУ в России, а также в Иране, Китае и в школьных и корпоративных сетях. Гарантии против каждого оператора нет, но протокол даёт настройки обфускации, которые проходят сегодня." } },
-    { "@type": "Question", "name": "Работает ли на ARM и Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Готовые модули ядра ARM64 покрывают Raspberry Pi 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный автоматически." } }
+    { "@type": "Question", "name": "Работает ли на ARM и Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Готовые модули ARM64 покрывают Raspberry Pi 3, 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный." } },
+    { "@type": "Question", "name": "Как обновиться на новую версию?", "acceptedAnswer": { "@type": "Answer", "text": "Скачайте скрипт нового релиза на тот же сервер и запустите его с флагом --force. Ключи сервера, клиенты и настройки обфускации переживают переустановку. После обновления ядра модуль DKMS пересобирается автоматически при следующей загрузке." } }
   ]
 }
 </script>
@@ -65,14 +69,14 @@
     </a>
     <nav class="nav-right" aria-label="Навигация по сайту">
       <span class="lang-switch"><a href="/amneziawg-installer/">EN</a><a class="active" aria-current="page" href="/amneziawg-installer/ru/">RU</a></span>
-      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Звезда на GitHub</a>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Поставить звезду</a>
     </nav>
   </div>
 </header>
 
 <main>
 
-<section class="hero" style="border-top:none">
+<section class="hero">
   <div class="wrap">
     <h1>Свой VPN-сервер AmneziaWG 2.0 одной командой</h1>
     <p class="lede">Превратите чистый VPS с Ubuntu или Debian в self-hosted VPN с обходом DPI и блокировок. Без Docker, без веб-панели, без знаний Linux.</p>
@@ -82,8 +86,8 @@
       <a class="btn" href="https://github.com/bivlked/amneziawg-installer">GitHub</a>
     </div>
     <div class="cmd">
-      <button class="copy-btn" data-copy="wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg.sh&#10;chmod +x install_amneziawg.sh&#10;sudo bash ./install_amneziawg.sh">Копировать</button>
-      <pre><span class="prompt">$ </span>wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg.sh
+      <button class="copy-btn" type="button" data-copy="wget -O install_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg.sh&#10;chmod +x install_amneziawg.sh&#10;sudo bash ./install_amneziawg.sh">Копировать</button>
+      <pre><span class="prompt">$ </span>wget -O install_amneziawg.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg.sh
 <span class="prompt">$ </span>chmod +x install_amneziawg.sh
 <span class="prompt">$ </span>sudo bash ./install_amneziawg.sh</pre>
     </div>
@@ -93,6 +97,7 @@
       <span>Ubuntu и Debian</span>
       <span>x86_64 и ARM64</span>
       <span>Без зависимостей в рантайме</span>
+      <span>800+ автотестов</span>
     </div>
   </div>
 </section>
@@ -114,7 +119,7 @@
       <div class="card"><div class="ico" aria-hidden="true">&#128737;</div><h3>Защита по умолчанию</h3><p>Firewall UFW с deny-all и лимитом на SSH, Fail2Ban, строгие права на файлы и hardening через sysctl.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128241;</div><h3>Управление клиентами</h3><p>Добавление, удаление, список и перегенерация. QR-коды, vpn-ссылки для импорта в одно касание и гостевые конфиги с датой истечения.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#127760;</div><h3>IPv6 dual-stack</h3><p>Опциональная двухстековая маршрутизация, по умолчанию выключена и включается одним флагом, когда нужно.</p></div>
-      <div class="card"><div class="ico" aria-hidden="true">&#128421;</div><h3>ARM и Raspberry Pi</h3><p>Готовые модули ядра для Raspberry Pi 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128421;</div><h3>ARM и Raspberry Pi</h3><p>Готовые модули ядра для Raspberry Pi 3, 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128260;</div><h3>Переживает перезагрузки</h3><p>Машина состояний с возобновлением после ребута и авто-починка DKMS, которая пересобирает модуль после обновления ядра.</p></div>
     </div>
   </div>
@@ -124,11 +129,11 @@
   <div class="wrap">
     <h2>Быстрый старт</h2>
     <p class="sub">От чистого VPS до работающего VPN за три шага.</p>
-    <div class="steps">
-      <div class="step"><span class="n"></span><p>Арендуйте чистый VPS с Ubuntu или Debian и подключитесь по SSH под root.</p></div>
-      <div class="step"><span class="n"></span><p>Запустите команду выше. Скрипт сам перезагрузит сервер, когда нужно. После ребута запустите её снова - она продолжит с того места, где остановилась.</p></div>
-      <div class="step"><span class="n"></span><p>Отсканируйте QR-код или откройте vpn-ссылку в Amnezia Client. Готово, вы подключены.</p></div>
-    </div>
+    <ol class="steps">
+      <li class="step"><span class="n" aria-hidden="true"></span><p>Арендуйте чистый VPS с Ubuntu или Debian и подключитесь по SSH под root.</p></li>
+      <li class="step"><span class="n" aria-hidden="true"></span><p>Запустите команду выше. Скрипт сам перезагрузит сервер, когда нужно. После ребута запустите её снова - она продолжит с того места, где остановилась.</p></li>
+      <li class="step"><span class="n" aria-hidden="true"></span><p>Отсканируйте QR-код или откройте vpn-ссылку в Amnezia Client. Готово, вы подключены.</p></li>
+    </ol>
     <p class="inline-note mt">Для автоматизации тот же скрипт принимает <code>--yes --route-all</code> и любой другой параметр флагом. <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Полный гайд</a> покрывает выбор VPS, нюансы ARM, troubleshooting и удаление.</p>
   </div>
 </section>
@@ -163,7 +168,8 @@
       <details><summary>Нужны ли знания Linux?</summary><div class="answer">Нет. Вы вставляете одну команду в SSH на чистом VPS. Скрипт сам ставит модуль ядра, настраивает firewall и форвардинг, создаёт первого клиента и печатает QR-код и vpn-ссылку.</div></details>
       <details><summary>Какой VPS выбрать?</summary><div class="answer">Чистый VPS с Ubuntu или Debian, 1 vCPU и от 512 МБ памяти. Скрипт рассчитан на отдельный VPS, а не на домашний роутер или shared-хостинг.</div></details>
       <details><summary>Обходит ли DPI и блокировки?</summary><div class="answer">AmneziaWG 2.0 добавляет обфускацию поверх WireGuard и сопротивляется DPI, который применяют ТСПУ в России, а также в Иране, Китае и в школьных и корпоративных сетях. Гарантии против каждого оператора нет, но протокол даёт настройки обфускации, которые проходят сегодня.</div></details>
-      <details><summary>Работает ли на ARM и Raspberry Pi?</summary><div class="answer">Да. Готовые модули ARM64 покрывают Raspberry Pi 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный.</div></details>
+      <details><summary>Работает ли на ARM и Raspberry Pi?</summary><div class="answer">Да. Готовые модули ARM64 покрывают Raspberry Pi 3, 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный.</div></details>
+      <details><summary>Как обновиться на новую версию?</summary><div class="answer">Скачайте скрипт нового релиза на тот же сервер и запустите его с флагом <code>--force</code>. Ключи сервера, клиенты и настройки обфускации переживают переустановку. После обновления ядра модуль DKMS пересобирается автоматически при следующей загрузке.</div></details>
     </div>
   </div>
 </section>
@@ -190,11 +196,17 @@
 
 <script>
 document.querySelectorAll(".copy-btn").forEach(function (b) {
+  var label = b.textContent, timer = null;
+  function flash(text) {
+    b.textContent = text;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function () { b.textContent = label; timer = null; }, 1500);
+  }
   b.addEventListener("click", function () {
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(b.getAttribute("data-copy")).then(function () {
-      var t = b.textContent; b.textContent = "Скопировано"; setTimeout(function () { b.textContent = t; }, 1500);
-    }).catch(function () {});
+    if (!navigator.clipboard) { flash("Ошибка"); return; }
+    navigator.clipboard.writeText(b.getAttribute("data-copy"))
+      .then(function () { flash("Скопировано"); })
+      .catch(function () { flash("Ошибка"); });
   });
 });
 </script>

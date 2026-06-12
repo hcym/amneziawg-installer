@@ -24,7 +24,10 @@
 <meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
 <meta name="twitter:title" content="AmneziaWG 2.0 VPN Installer for Ubuntu and Debian VPS">
 <meta name="twitter:description" content="One command turns a clean Ubuntu or Debian VPS into a DPI-resistant AmneziaWG 2.0 VPN server. Open source, MIT licensed.">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="stylesheet" href="assets/style.css">
 <script type="application/ld+json">
 {
@@ -46,11 +49,12 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    { "@type": "Question", "name": "Is it free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The installer is open source under the MIT license. You only pay for the VPS you run it on, which starts around 3 to 5 dollars a month." } },
-    { "@type": "Question", "name": "Do I need Linux experience?", "acceptedAnswer": { "@type": "Answer", "text": "No. You copy one command into an SSH session on a clean Ubuntu or Debian VPS. The script handles the kernel module, firewall, forwarding, and the first client, and prints a QR code and a vpn link for the Amnezia client." } },
-    { "@type": "Question", "name": "Which VPS should I pick?", "acceptedAnswer": { "@type": "Answer", "text": "A clean Ubuntu or Debian VPS with 1 vCPU and at least 512 MB of RAM is enough. It is meant for a dedicated VPS, not a home router or shared hosting." } },
-    { "@type": "Question", "name": "Does it bypass DPI and censorship?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 adds traffic obfuscation on top of WireGuard, with junk packets and header masking to resist DPI used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today." } },
-    { "@type": "Question", "name": "Does it run on ARM and Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Prebuilt ARM64 kernel modules cover Raspberry Pi 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command selects the right one automatically." } }
+    { "@type": "Question", "name": "Is it free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The installer is open source under the MIT license. You only pay for the VPS, which starts around 3 to 5 dollars a month." } },
+    { "@type": "Question", "name": "Do I need Linux experience?", "acceptedAnswer": { "@type": "Answer", "text": "No. You copy one command into an SSH session on a clean VPS. The script handles the kernel module, firewall, forwarding, and the first client, then prints a QR code and a vpn link." } },
+    { "@type": "Question", "name": "Which VPS should I pick?", "acceptedAnswer": { "@type": "Answer", "text": "A clean Ubuntu or Debian VPS with 1 vCPU and at least 512 MB of RAM. It is meant for a dedicated VPS, not a home router or shared hosting." } },
+    { "@type": "Question", "name": "Does it bypass DPI and censorship?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today." } },
+    { "@type": "Question", "name": "Does it run on ARM and Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one." } },
+    { "@type": "Question", "name": "How do I update to a new release?", "acceptedAnswer": { "@type": "Answer", "text": "Download the new release script on the same server and run it with the --force flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot." } }
   ]
 }
 </script>
@@ -72,7 +76,7 @@
 
 <main>
 
-<section class="hero" style="border-top:none">
+<section class="hero">
   <div class="wrap">
     <h1>AmneziaWG 2.0 VPN server in one command</h1>
     <p class="lede">Turn a clean Ubuntu or Debian VPS into a self-hosted, DPI-resistant VPN. No Docker, no web panel, no Linux experience required.</p>
@@ -82,8 +86,8 @@
       <a class="btn" href="https://github.com/bivlked/amneziawg-installer">GitHub</a>
     </div>
     <div class="cmd">
-      <button class="copy-btn" data-copy="wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg_en.sh&#10;chmod +x install_amneziawg_en.sh&#10;sudo bash ./install_amneziawg_en.sh">Copy</button>
-      <pre><span class="prompt">$ </span>wget https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg_en.sh
+      <button class="copy-btn" type="button" data-copy="wget -O install_amneziawg_en.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg_en.sh&#10;chmod +x install_amneziawg_en.sh&#10;sudo bash ./install_amneziawg_en.sh">Copy</button>
+      <pre><span class="prompt">$ </span>wget -O install_amneziawg_en.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg_en.sh
 <span class="prompt">$ </span>chmod +x install_amneziawg_en.sh
 <span class="prompt">$ </span>sudo bash ./install_amneziawg_en.sh</pre>
     </div>
@@ -93,6 +97,7 @@
       <span>Ubuntu and Debian</span>
       <span>x86_64 and ARM64</span>
       <span>No runtime dependencies</span>
+      <span>800+ automated tests</span>
     </div>
   </div>
 </section>
@@ -114,7 +119,7 @@
       <div class="card"><div class="ico" aria-hidden="true">&#128737;</div><h3>Hardened by default</h3><p>UFW firewall with deny-all and SSH rate limiting, Fail2Ban, strict file permissions, and sysctl hardening.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128241;</div><h3>Client management</h3><p>Add, remove, list, and regenerate clients. QR codes, vpn links for one-tap import, and time-limited guest configs with an expiry date.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#127760;</div><h3>IPv6 dual-stack</h3><p>Optional dual-stack routing, off by default and enabled with a single flag when you need it.</p></div>
-      <div class="card"><div class="ico" aria-hidden="true">&#128421;</div><h3>ARM and Raspberry Pi</h3><p>Prebuilt kernel modules for Raspberry Pi 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128421;</div><h3>ARM and Raspberry Pi</h3><p>Prebuilt kernel modules for Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128260;</div><h3>Survives reboots</h3><p>A resume-after-reboot state machine, plus DKMS auto-repair that rebuilds the module after kernel upgrades.</p></div>
     </div>
   </div>
@@ -124,11 +129,11 @@
   <div class="wrap">
     <h2>Quick start</h2>
     <p class="sub">From a clean VPS to a working VPN in three steps.</p>
-    <div class="steps">
-      <div class="step"><span class="n"></span><p>Rent a clean Ubuntu or Debian VPS and connect over SSH as root.</p></div>
-      <div class="step"><span class="n"></span><p>Run the command above. The script reboots when it needs to. After a reboot, run it again and it resumes from where it stopped.</p></div>
-      <div class="step"><span class="n"></span><p>Scan the QR code or open the vpn link in the Amnezia client. You are connected.</p></div>
-    </div>
+    <ol class="steps">
+      <li class="step"><span class="n" aria-hidden="true"></span><p>Rent a clean Ubuntu or Debian VPS and connect over SSH as root.</p></li>
+      <li class="step"><span class="n" aria-hidden="true"></span><p>Run the command above. The script reboots when it needs to. After a reboot, run it again and it resumes from where it stopped.</p></li>
+      <li class="step"><span class="n" aria-hidden="true"></span><p>Scan the QR code or open the vpn link in the Amnezia client. You are connected.</p></li>
+    </ol>
     <p class="inline-note mt">For automation, the same script takes <code>--yes --route-all</code> and every other parameter as a flag. The <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">full guide</a> covers VPS choice, ARM notes, troubleshooting, and uninstall.</p>
   </div>
 </section>
@@ -163,7 +168,8 @@
       <details><summary>Do I need Linux experience?</summary><div class="answer">No. You copy one command into an SSH session on a clean VPS. The script handles the kernel module, firewall, forwarding, and the first client, then prints a QR code and a vpn link.</div></details>
       <details><summary>Which VPS should I pick?</summary><div class="answer">A clean Ubuntu or Debian VPS with 1 vCPU and at least 512 MB of RAM. It is meant for a dedicated VPS, not a home router or shared hosting.</div></details>
       <details><summary>Does it bypass DPI and censorship?</summary><div class="answer">AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today.</div></details>
-      <details><summary>Does it run on ARM and Raspberry Pi?</summary><div class="answer">Yes. Prebuilt ARM64 modules cover Raspberry Pi 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one.</div></details>
+      <details><summary>Does it run on ARM and Raspberry Pi?</summary><div class="answer">Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one.</div></details>
+      <details><summary>How do I update to a new release?</summary><div class="answer">Download the new release script on the same server and run it with the <code>--force</code> flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot.</div></details>
     </div>
   </div>
 </section>
@@ -190,11 +196,17 @@
 
 <script>
 document.querySelectorAll(".copy-btn").forEach(function (b) {
+  var label = b.textContent, timer = null;
+  function flash(text) {
+    b.textContent = text;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function () { b.textContent = label; timer = null; }, 1500);
+  }
   b.addEventListener("click", function () {
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(b.getAttribute("data-copy")).then(function () {
-      var t = b.textContent; b.textContent = "Copied"; setTimeout(function () { b.textContent = t; }, 1500);
-    }).catch(function () {});
+    if (!navigator.clipboard) { flash("Error"); return; }
+    navigator.clipboard.writeText(b.getAttribute("data-copy"))
+      .then(function () { flash("Copied"); })
+      .catch(function () { flash("Error"); });
   });
 });
 </script>
