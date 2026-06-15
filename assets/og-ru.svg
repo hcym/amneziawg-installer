@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e1116"/>
+      <stop offset="1" stop-color="#11202a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.28" r="0.5">
+      <stop offset="0" stop-color="#3ddc97" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#3ddc97" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="0" y="0" width="10" height="630" fill="#3ddc97"/>
+  <g transform="translate(840 110) scale(13)" opacity="0.10">
+    <path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#3ddc97"/>
+  </g>
+  <g transform="translate(80 92)">
+    <rect width="46" height="46" rx="10" fill="#3ddc97"/>
+    <g transform="translate(7 7) scale(1)">
+      <path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/>
+    </g>
+    <text x="62" y="31" font-size="26" font-weight="700" fill="#e6edf3">amneziawg-installer</text>
+  </g>
+  <text x="80" y="250" font-size="62" font-weight="800" fill="#e6edf3" letter-spacing="-1">VPN-сервер AmneziaWG 2.0</text>
+  <text x="80" y="326" font-size="62" font-weight="800" fill="#3ddc97" letter-spacing="-1">одной командой</text>
+  <text x="80" y="384" font-size="28" fill="#9aa7b4">Self-hosted, с обходом DPI. VPS на Ubuntu и Debian.</text>
+  <g transform="translate(80 432)">
+    <rect width="900" height="78" rx="12" fill="#0a0d12" stroke="#2a323d" stroke-width="1.5"/>
+    <circle cx="26" cy="26" r="5.5" fill="#ff5f56"/>
+    <circle cx="46" cy="26" r="5.5" fill="#ffbd2e"/>
+    <circle cx="66" cy="26" r="5.5" fill="#27c93f"/>
+    <text x="26" y="62" font-family="Consolas, 'Liberation Mono', monospace" font-size="25" fill="#cdd9e5"><tspan fill="#3ddc97">$ </tspan>sudo bash ./install_amneziawg.sh</text>
+  </g>
+  <text x="80" y="566" font-size="23" fill="#9aa7b4">MIT licensed  &#183;  github.com/bivlked/amneziawg-installer</text>
+</svg>

@@ -61,6 +61,7 @@
 </script>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 
 <header class="site-header">
   <div class="wrap">
@@ -69,13 +70,13 @@
       amneziawg-installer
     </a>
     <nav class="nav-right" aria-label="Site navigation">
-      <span class="lang-switch"><a class="active" aria-current="page" href="/amneziawg-installer/">EN</a><a href="/amneziawg-installer/ru/">RU</a></span>
+      <span class="lang-switch"><a class="active" aria-current="page" aria-label="English" href="/amneziawg-installer/">EN</a><a aria-label="Русский" href="/amneziawg-installer/ru/">RU</a></span>
       <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Star on GitHub</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
 <section class="hero">
   <div class="wrap">
@@ -84,16 +85,15 @@
     <div class="cta-row">
       <a class="btn btn-primary" href="#quick-start">Quick start</a>
       <a class="btn" href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Full guide</a>
-      <a class="btn" href="compare/">vs the official app</a>
-      <a class="btn" href="cascade/">Cascade setup</a>
       <a class="btn" href="https://github.com/bivlked/amneziawg-installer">GitHub</a>
     </div>
     <div class="cmd">
-      <button class="copy-btn" type="button" data-copy="wget -O install_amneziawg_en.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg_en.sh&#10;chmod +x install_amneziawg_en.sh&#10;sudo bash ./install_amneziawg_en.sh">Copy</button>
+      <button class="copy-btn" type="button" aria-label="Copy install command" data-copy="wget -O install_amneziawg_en.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg_en.sh&#10;chmod +x install_amneziawg_en.sh&#10;sudo bash ./install_amneziawg_en.sh">Copy</button>
       <pre><span class="prompt">$ </span>wget -O install_amneziawg_en.sh https://raw.githubusercontent.com/bivlked/amneziawg-installer/v5.16.0/install_amneziawg_en.sh
 <span class="prompt">$ </span>chmod +x install_amneziawg_en.sh
 <span class="prompt">$ </span>sudo bash ./install_amneziawg_en.sh</pre>
     </div>
+    <p class="sr-only" role="status" aria-live="polite" data-copy-status></p>
     <p class="inline-note">Pin the latest version from the <a href="https://github.com/bivlked/amneziawg-installer/releases">releases page</a>. Three commands, two reboots, about twenty minutes to a working VPN.</p>
     <div class="trust">
       <span>MIT licensed</span>
@@ -102,6 +102,27 @@
       <span>No runtime dependencies</span>
       <span>800+ automated tests</span>
     </div>
+    <figure class="hero-art" aria-hidden="true">
+      <svg viewBox="0 0 760 132" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+        <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
+        <rect x="14" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <text x="104" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Your device</text>
+        <text x="104" y="87" text-anchor="middle" font-size="12" fill="#9aa7b4">one app, one tap</text>
+        <line x1="198" y1="71" x2="288" y2="71" stroke="#3ddc97" stroke-width="2" marker-end="url(#ar)"/>
+        <text x="243" y="60" text-anchor="middle" font-size="11.5" fill="#9aa7b4">obfuscated</text>
+        <rect x="292" y="30" width="176" height="82" rx="12" fill="#10261c" stroke="#2bbd80"/>
+        <g transform="translate(367 38) scale(0.78)"><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#3ddc97"/></g>
+        <text x="380" y="84" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">AmneziaWG VPS</text>
+        <text x="380" y="102" text-anchor="middle" font-size="12" fill="#9aa7b4">hardened kernel module</text>
+        <line x1="472" y1="71" x2="562" y2="71" stroke="#3ddc97" stroke-width="2" marker-end="url(#ar)"/>
+        <text x="517" y="60" text-anchor="middle" font-size="11.5" fill="#9aa7b4">DPI-resistant</text>
+        <rect x="566" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <circle cx="600" cy="71" r="13" fill="none" stroke="#3ddc97" stroke-width="1.6"/>
+        <path d="M587 71h26M600 58c6 4 6 22 0 26M600 58c-6 4-6 22 0 26" fill="none" stroke="#3ddc97" stroke-width="1.2"/>
+        <text x="660" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Internet</text>
+        <text x="660" y="87" text-anchor="middle" font-size="12" fill="#9aa7b4">clean exit</text>
+      </svg>
+    </figure>
   </div>
 </section>
 
@@ -163,6 +184,27 @@
   </div>
 </section>
 
+<section id="guides" class="related">
+  <div class="wrap">
+    <h2>Guides and comparisons</h2>
+    <p class="sub">Two deeper reads once the basic server is running.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9878;&#65039;</div>
+        <h3>vs the official Amnezia app</h3>
+        <p>Same AmneziaWG 2.0 protocol, different delivery: no Docker, the whole server tuned and hardened, and fine control over the obfuscation.</p>
+        <a class="go" href="compare/">How it differs &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128279;</div>
+        <h3>Two-server cascade</h3>
+        <p>Chain two servers so Russian traffic exits directly from a Russian IP while everything else goes through a foreign exit. The split lives on the server.</p>
+        <a class="go" href="cascade/">Cascade setup &#8594;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="faq">
   <div class="wrap">
     <h2>FAQ</h2>
@@ -192,7 +234,7 @@
         </div>
         <p class="note">Open source under the MIT license. If the project helped you, a star on GitHub helps others find it.</p>
       </div>
-      <div class="lang-switch"><a class="active" aria-current="page" href="/amneziawg-installer/">EN</a> <a href="/amneziawg-installer/ru/">RU</a></div>
+      <div class="lang-switch"><a class="active" aria-current="page" aria-label="English" href="/amneziawg-installer/">EN</a> <a aria-label="Русский" href="/amneziawg-installer/ru/">RU</a></div>
     </div>
   </div>
 </footer>
@@ -200,8 +242,10 @@
 <script>
 document.querySelectorAll(".copy-btn").forEach(function (b) {
   var label = b.textContent, timer = null;
+  var status = document.querySelector("[data-copy-status]");
   function flash(text) {
     b.textContent = text;
+    if (status) status.textContent = text === "Copied" ? "Command copied to clipboard" : "Copy failed";
     if (timer) clearTimeout(timer);
     timer = setTimeout(function () { b.textContent = label; timer = null; }, 1500);
   }

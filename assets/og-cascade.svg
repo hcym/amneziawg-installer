@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e1116"/>
+      <stop offset="1" stop-color="#11202a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.28" r="0.5">
+      <stop offset="0" stop-color="#3ddc97" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#3ddc97" stop-opacity="0"/>
+    </radialGradient>
+    <marker id="oga" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="0" y="0" width="10" height="630" fill="#3ddc97"/>
+  <g transform="translate(840 110) scale(13)" opacity="0.10">
+    <path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#3ddc97"/>
+  </g>
+  <g transform="translate(80 92)">
+    <rect width="46" height="46" rx="10" fill="#3ddc97"/>
+    <g transform="translate(7 7) scale(1)">
+      <path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/>
+    </g>
+    <text x="62" y="31" font-size="26" font-weight="700" fill="#e6edf3">amneziawg-installer</text>
+  </g>
+  <text x="80" y="252" font-size="62" font-weight="800" fill="#e6edf3" letter-spacing="-1">Two-server</text>
+  <text x="80" y="328" font-size="62" font-weight="800" fill="#3ddc97" letter-spacing="-1">cascade VPN</text>
+  <text x="80" y="392" font-size="29" fill="#9aa7b4">Russian traffic direct, the rest abroad.</text>
+  <text x="80" y="432" font-size="29" fill="#9aa7b4">Double VPN, split routing on the server.</text>
+  <g transform="translate(80 480)" font-size="22">
+    <rect width="170" height="56" rx="12" fill="#1b222c" stroke="#2a323d"/>
+    <text x="85" y="35" text-anchor="middle" fill="#e6edf3">Client</text>
+    <line x1="172" y1="28" x2="214" y2="28" stroke="#3ddc97" stroke-width="2" marker-end="url(#oga)"/>
+    <rect x="218" width="200" height="56" rx="12" fill="#10261c" stroke="#2bbd80"/>
+    <text x="318" y="35" text-anchor="middle" fill="#3ddc97" font-weight="700">Entry (Russia)</text>
+    <line x1="420" y1="28" x2="462" y2="28" stroke="#3ddc97" stroke-width="2" marker-end="url(#oga)"/>
+    <rect x="466" width="200" height="56" rx="12" fill="#10261c" stroke="#2bbd80"/>
+    <text x="566" y="35" text-anchor="middle" fill="#3ddc97" font-weight="700">Exit (abroad)</text>
+  </g>
+  <text x="80" y="592" font-size="22" fill="#9aa7b4">MIT licensed  &#183;  github.com/bivlked/amneziawg-installer</text>
+</svg>

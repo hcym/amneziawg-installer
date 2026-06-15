@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Чем amneziawg-installer отличается от официального приложения Amnezia</title>
-<meta name="description" content="Что amneziawg-installer делает иначе, чем официальное приложение Amnezia VPN: тот же протокол AmneziaWG 2.0, но без оверхеда Docker, с оптимизацией и защитой всего сервера и тонкой настройкой обфускации.">
+<title>Чем amneziawg-installer отличается от приложения Amnezia</title>
+<meta name="description" content="Чем amneziawg-installer отличается от официального приложения Amnezia: тот же протокол AmneziaWG 2.0, но без Docker, с оптимизацией и защитой всего сервера и тонкой настройкой обфускации.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/compare/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/compare/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/compare/">
@@ -14,14 +14,14 @@
 <meta property="og:description" content="Тот же протокол AmneziaWG 2.0, но без оверхеда Docker, с оптимизацией и защитой всего сервера и тонкой настройкой обфускации.">
 <meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/ru/compare/">
 <meta property="og:site_name" content="amneziawg-installer">
-<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-compare-ru.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="amneziawg-installer - VPN-сервер AmneziaWG 2.0 одной командой">
+<meta property="og:image:alt" content="amneziawg-installer и официальное приложение Amnezia">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-compare-ru.png">
 <meta name="twitter:title" content="Чем amneziawg-installer отличается от официального приложения Amnezia">
 <meta name="twitter:description" content="Тот же протокол AmneziaWG 2.0, но без оверхеда Docker и с оптимизацией всего сервера.">
 <meta name="theme-color" content="#0e1116">
@@ -38,7 +38,8 @@
     { "@type": "Question", "name": "Использует ли он Docker на сервере?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. AmneziaWG ставится модулем ядра через DKMS, поэтому в фоне не работает ни Docker-демон, ни стек контейнеров. Это держит расход RAM и CPU низким - что особенно важно на дешёвом VPS, но полезно на любом сервере." } },
     { "@type": "Question", "name": "Оптимизирует ли он сам сервер?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Скрипт определяет RAM и сетевую карту, затем настраивает sysctl-буферы, размер swap и офлоады NIC и включает BBR. Ещё он вырезает лишние пакеты и службы, чтобы сервер делал одну задачу. Официальное приложение разворачивает контейнеры и сам сервер не оптимизирует и не настраивает." } },
     { "@type": "Question", "name": "Можно ли подстроить обфускацию под оператора или сеть?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Есть пресет для мобильных сетей, прямой доступ к параметрам AmneziaWG 2.0 и полевые данные по поведению DPI, так что обфускацию можно подстроить под конкретного оператора или сеть." } },
-    { "@type": "Question", "name": "Протокол и защита те же самые?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Под капотом тот же AmneziaWG 2.0, поэтому обфускация против DPI одна и та же. Установщик с открытым кодом под лицензией MIT, это читаемый bash, который можно просмотреть перед запуском, и на нём более 800 автотестов. Ставится тот же upstream AmneziaWG - это автоматизация и настройка сервера, а не форк протокола." } }
+    { "@type": "Question", "name": "Протокол и защита те же самые?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Под капотом тот же AmneziaWG 2.0, поэтому обфускация против DPI одна и та же. Установщик с открытым кодом под лицензией MIT, это читаемый bash, который можно просмотреть перед запуском, и на нём более 800 автотестов. Ставится тот же upstream AmneziaWG - это автоматизация и настройка сервера, а не форк протокола." } },
+    { "@type": "Question", "name": "Чем он отличается от других скриптов установки AmneziaWG?", "acceptedAnswer": { "@type": "Answer", "text": "amneziawg-installer делает упор на полностью настроенный VPS под одну задачу: более глубокая оптимизация и защита сервера, тюнинг обфускации под мобильные сети и DPI, клиенты с истечением срока, полноценные русская и английская версии и без веб-панели по умолчанию. Многие другие скрипты останавливаются на рабочем туннеле или добавляют веб-панель, а этот автоматизирует весь сервер целиком и проверен более чем 800 автотестами." } }
   ]
 }
 </script>
@@ -52,8 +53,25 @@
   ]
 }
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Чем amneziawg-installer отличается от официального приложения Amnezia",
+  "description": "Чем amneziawg-installer отличается от официального приложения Amnezia: тот же протокол AmneziaWG 2.0, но без Docker, с оптимизацией и защитой всего сервера и тонкой настройкой обфускации.",
+  "inLanguage": "ru",
+  "image": "https://bivlked.github.io/amneziawg-installer/assets/og-compare-ru.png",
+  "datePublished": "2026-06-15",
+  "dateModified": "2026-06-15",
+  "author": { "@type": "Person", "name": "bivlked" },
+  "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
+  "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/ru/compare/",
+  "isPartOf": "https://bivlked.github.io/amneziawg-installer/ru/"
+}
+</script>
 </head>
 <body>
+<a class="skip-link" href="#main">К содержимому</a>
 
 <header class="site-header">
   <div class="wrap">
@@ -62,13 +80,13 @@
       amneziawg-installer
     </a>
     <nav class="nav-right" aria-label="Навигация по сайту">
-      <span class="lang-switch"><a href="/amneziawg-installer/compare/">EN</a><a class="active" aria-current="page" href="/amneziawg-installer/ru/compare/">RU</a></span>
-      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Star на GitHub</a>
+      <span class="lang-switch"><a aria-label="English" href="/amneziawg-installer/compare/">EN</a><a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/compare/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Поставить звезду</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
 <section class="hero">
   <div class="wrap">
@@ -87,10 +105,14 @@
     <p class="sub">Под капотом в обоих случаях AmneziaWG 2.0. Разница в том, как разворачивается сервер и насколько он настроен.</p>
     <div class="grid">
       <div class="card">
+        <div class="ico" aria-hidden="true">&#128421;&#65039;</div>
+        <span class="tag neutral">Официальный GUI</span>
         <h3>Официальное приложение Amnezia</h3>
         <p>Графический клиент для десктопа и телефона. Вы указываете сервер, оно разворачивает серверную часть в Docker по SSH и управляет клиентами из приложения. Удобный официальный путь, когда нужен только GUI; сам сервер при этом остаётся без такой настройки.</p>
       </div>
-      <div class="card">
+      <div class="card lead">
+        <div class="ico" aria-hidden="true">&#9889;</div>
+        <span class="tag ours">Этот установщик</span>
         <h3>amneziawg-installer</h3>
         <p>Одна SSH-команда превращает выделенный VPS в настроенный VPN-бокс. AmneziaWG работает модулем ядра, весь сервер оптимизируется и харднится под одну задачу, клиентами вы управляете из командной строки. Никакого Docker и ничего лишнего в фоне.</p>
       </div>
@@ -125,8 +147,8 @@
       </div>
       <div class="card">
         <div class="ico" aria-hidden="true">&#128295;</div>
-        <h3>Headless и автоматизация</h3>
-        <p>Одна SSH-команда, любой параметр флагом, без десктоп-приложения. Управление клиентами из CLI, гостевые конфиги по сроку, импорт по QR и vpn-ссылке, вывод в JSON для скриптов.</p>
+        <h3>Через CLI и автоматизация</h3>
+        <p>Одна SSH-команда, любой параметр флагом, без десктоп-приложения. Управление клиентами из командной строки, гостевые конфиги по сроку, импорт по QR и vpn-ссылке, вывод в JSON для скриптов.</p>
       </div>
       <div class="card">
         <div class="ico" aria-hidden="true">&#128421;</div>
@@ -158,6 +180,27 @@
       <details><summary>Оптимизирует ли он сам сервер?</summary><div class="answer">Да. Скрипт определяет RAM и сетевую карту, затем настраивает sysctl-буферы, размер swap и офлоады NIC и включает BBR. Ещё он вырезает лишние пакеты, чтобы сервер делал одну задачу. Официальное приложение разворачивает контейнеры и сам сервер не оптимизирует и не настраивает.</div></details>
       <details><summary>Можно ли подстроить обфускацию под оператора или сеть?</summary><div class="answer">Да. Есть пресет для мобильных сетей, прямой доступ к параметрам AmneziaWG 2.0 и полевые данные по поведению DPI, так что обфускацию можно подстроить под конкретного оператора или сеть.</div></details>
       <details><summary>Протокол и защита те же самые?</summary><div class="answer">Да. Под капотом тот же AmneziaWG 2.0, поэтому обфускация против DPI одна и та же. Установщик с открытым кодом под лицензией MIT, читаемый bash, который можно просмотреть перед запуском, и более 800 автотестов. Ставится тот же upstream AmneziaWG - автоматизация и настройка сервера, а не форк протокола.</div></details>
+      <details><summary>Чем он отличается от других скриптов установки AmneziaWG?</summary><div class="answer">amneziawg-installer делает упор на полностью настроенный VPS под одну задачу: более глубокая оптимизация и защита сервера, тюнинг обфускации под мобильные сети и DPI, клиенты с истечением срока, полноценные русская и английская версии и без веб-панели по умолчанию. Многие другие скрипты останавливаются на рабочем туннеле или добавляют веб-панель, а этот автоматизирует весь сервер целиком и проверен более чем 800 автотестами.</div></details>
+    </div>
+  </div>
+</section>
+
+<section id="related" class="related">
+  <div class="wrap">
+    <h2>Смотрите также</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128279;</div>
+        <h3>Каскад из двух серверов</h3>
+        <p>Свяжите два сервера: российский трафик уходит напрямую с российского IP, остальное - через зарубежный выход.</p>
+        <a class="go" href="/amneziawg-installer/ru/cascade/">Настройка каскада &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128640;</div>
+        <h3>Начать</h3>
+        <p>Одна команда превращает чистый VPS с Ubuntu или Debian в рабочий сервер AmneziaWG 2.0.</p>
+        <a class="go" href="/amneziawg-installer/ru/#quick-start">Быстрый старт &#8594;</a>
+      </div>
     </div>
   </div>
 </section>
@@ -172,11 +215,13 @@
           <a href="/amneziawg-installer/ru/">Главная</a>
           <a href="https://github.com/bivlked/amneziawg-installer">Репозиторий</a>
           <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Гайд по установке</a>
-          <a href="https://github.com/bivlked/amneziawg-installer#similar-tools">Все похожие инструменты</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.md">Расширенно</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CHANGELOG.md">Изменения</a>
+          <a href="https://github.com/bivlked/amneziawg-installer#similar-tools">Похожие инструменты</a>
         </div>
         <p class="note">Открытый код под лицензией MIT. Если проект помог, звезда на GitHub поможет другим его найти.</p>
       </div>
-      <div class="lang-switch"><a href="/amneziawg-installer/compare/">EN</a> <a class="active" aria-current="page" href="/amneziawg-installer/ru/compare/">RU</a></div>
+      <div class="lang-switch"><a aria-label="English" href="/amneziawg-installer/compare/">EN</a> <a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/compare/">RU</a></div>
     </div>
   </div>
 </footer>

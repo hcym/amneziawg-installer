@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Каскад из двух серверов: российский трафик напрямую, остальное за границу</title>
-<meta name="description" content="Каскад из двух серверов (двойной VPN) на AmneziaWG: клиент подключается к серверу-входу, российский трафик уходит напрямую с российского IP, остальное - через зарубежный сервер-выход. Раздельная маршрутизация на сервере, на базе amneziawg-installer.">
+<title>Каскад из двух VPN-серверов: российский трафик напрямую</title>
+<meta name="description" content="Каскад из двух серверов (двойной VPN) на AmneziaWG: российский трафик уходит напрямую с российского IP, остальное - через зарубежный выход. Деление на сервере.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/cascade/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
@@ -14,14 +14,14 @@
 <meta property="og:description" content="Каскад (двойной VPN) на AmneziaWG с раздельной маршрутизацией на сервере: российский трафик напрямую, остальное через зарубежный выход.">
 <meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
 <meta property="og:site_name" content="amneziawg-installer">
-<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-cascade-ru.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="amneziawg-installer - сервер AmneziaWG 2.0 одной командой">
+<meta property="og:image:alt" content="Каскад из двух серверов AmneziaWG: российский трафик напрямую, остальное за границу">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:locale:alternate" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-cascade-ru.png">
 <meta name="twitter:title" content="Каскад из двух серверов: российский трафик напрямую, остальное за границу">
 <meta name="twitter:description" content="Каскад (двойной VPN) на AmneziaWG с раздельной маршрутизацией на сервере.">
 <meta name="theme-color" content="#0e1116">
@@ -52,8 +52,25 @@
   ]
 }
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Каскад из двух серверов: российский трафик напрямую, остальное за границу",
+  "description": "Каскад из двух серверов (двойной VPN) на AmneziaWG с раздельной маршрутизацией на сервере: российский трафик уходит напрямую с российского IP, остальное - через зарубежный выход.",
+  "inLanguage": "ru",
+  "image": "https://bivlked.github.io/amneziawg-installer/assets/og-cascade-ru.png",
+  "datePublished": "2026-06-15",
+  "dateModified": "2026-06-15",
+  "author": { "@type": "Person", "name": "bivlked" },
+  "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
+  "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/ru/cascade/",
+  "isPartOf": "https://bivlked.github.io/amneziawg-installer/ru/"
+}
+</script>
 </head>
 <body>
+<a class="skip-link" href="#main">К содержимому</a>
 
 <header class="site-header">
   <div class="wrap">
@@ -62,13 +79,13 @@
       amneziawg-installer
     </a>
     <nav class="nav-right" aria-label="Навигация по сайту">
-      <span class="lang-switch"><a href="/amneziawg-installer/cascade/">EN</a><a class="active" aria-current="page" href="/amneziawg-installer/ru/cascade/">RU</a></span>
-      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Star на GitHub</a>
+      <span class="lang-switch"><a aria-label="English" href="/amneziawg-installer/cascade/">EN</a><a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/cascade/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Поставить звезду</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
 <section class="hero">
   <div class="wrap">
@@ -85,6 +102,34 @@
   <div class="wrap">
     <h2>Как это работает</h2>
     <p class="sub">Одно подключение клиента, два сервера, трафик делится по месту назначения.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схема движения трафика: клиент одним подключением заходит на сервер-вход в России; российские сети уходят напрямую и видны с российского IP, а всё остальное идёт через зарубежный сервер-выход и видно с зарубежного IP." font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+        <defs><marker id="cad" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
+        <rect x="24" y="150" width="150" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <text x="99" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Клиент</text>
+        <text x="99" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">одно подключение</text>
+        <line x1="176" y1="183" x2="232" y2="183" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <rect x="236" y="138" width="186" height="92" rx="12" fill="#10261c" stroke="#2bbd80"/>
+        <g transform="translate(248 150) scale(0.7)"><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#3ddc97"/></g>
+        <text x="342" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Сервер-вход</text>
+        <text x="342" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">в России, держит сплит</text>
+        <path d="M422 166 C 502 122, 542 98, 612 92" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <text x="516" y="110" text-anchor="middle" font-size="12" fill="#9aa7b4">сети РФ, напрямую</text>
+        <rect x="616" y="58" width="180" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <text x="706" y="86" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Российские сайты</text>
+        <text x="706" y="105" text-anchor="middle" font-size="12" fill="#9aa7b4">видят российский IP</text>
+        <path d="M404 230 C 422 270, 442 287, 484 293" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <text x="432" y="268" text-anchor="middle" font-size="12" fill="#9aa7b4">всё остальное</text>
+        <rect x="488" y="262" width="160" height="78" rx="12" fill="#10261c" stroke="#2bbd80"/>
+        <text x="568" y="296" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Сервер-выход</text>
+        <text x="568" y="315" text-anchor="middle" font-size="12" fill="#9aa7b4">за границей</text>
+        <line x1="650" y1="301" x2="694" y2="301" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <rect x="698" y="268" width="118" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <text x="757" y="296" text-anchor="middle" font-size="13" font-weight="600" fill="#e6edf3">Зарубежные</text>
+        <text x="757" y="314" text-anchor="middle" font-size="12" fill="#9aa7b4">чистый IP</text>
+      </svg>
+      <figcaption>Одно подключение клиента. Сервер-вход отправляет российский трафик напрямую, а остальное - через зарубежный выход.</figcaption>
+    </figure>
     <div class="grid">
       <div class="card">
         <div class="ico" aria-hidden="true">&#128272;</div>
@@ -121,7 +166,7 @@
   <div class="wrap">
     <h2>На проверенной основе</h2>
     <p class="sub">Инструкция не набросок - маршрутизацию проверили вживую.</p>
-    <p>Каскад работает поверх двух обычных установок amneziawg-installer. В инструкции - идемпотентный скрипт маршрутизации и systemd-юнит, чтобы деление само поднималось после перезагрузки. Всё проверено на живом стенде из двух серверов: и сам сплит, и повторные запуски, и восстановление после ребута. Схему предложил в community-разборе @glfenix, полностью задокументирована в репозитории.</p>
+    <p>Каскад работает поверх двух обычных установок amneziawg-installer. В инструкции - идемпотентный скрипт маршрутизации и systemd-юнит, чтобы деление само поднималось после перезагрузки. Всё проверено на живом стенде из двух серверов: и сам сплит, и повторные запуски, и восстановление после ребута. Схему предложил в обсуждении сообщества @glfenix, полностью задокументирована в репозитории.</p>
     <div class="cta-row">
       <a class="btn" href="https://github.com/bivlked/amneziawg-installer/discussions/120">Обсуждение #120</a>
     </div>
@@ -141,6 +186,26 @@
   </div>
 </section>
 
+<section id="related" class="related">
+  <div class="wrap">
+    <h2>Смотрите также</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9878;&#65039;</div>
+        <h3>Сравнение с приложением Amnezia</h3>
+        <p>Тот же протокол AmneziaWG 2.0, но иначе: без Docker, весь сервер оптимизирован и защищён, тонкая настройка обфускации.</p>
+        <a class="go" href="/amneziawg-installer/ru/compare/">Чем отличается &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128640;</div>
+        <h3>Начать</h3>
+        <p>Каждый сервер в каскаде - это обычная установка. Одна команда превращает чистый VPS в рабочий сервер AmneziaWG 2.0.</p>
+        <a class="go" href="/amneziawg-installer/ru/#quick-start">Быстрый старт &#8594;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <footer class="site-footer">
@@ -150,12 +215,14 @@
         <div class="foot-links">
           <a href="/amneziawg-installer/ru/">Главная</a>
           <a href="https://github.com/bivlked/amneziawg-installer">Репозиторий</a>
-          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.md">Гайд по каскаду</a>
           <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Гайд по установке</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.md">Расширенно</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CHANGELOG.md">Изменения</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.md">Гайд по каскаду</a>
         </div>
         <p class="note">Открытый код под лицензией MIT. Если проект помог - звезда на GitHub помогает другим его найти.</p>
       </div>
-      <div class="lang-switch"><a href="/amneziawg-installer/cascade/">EN</a> <a class="active" aria-current="page" href="/amneziawg-installer/ru/cascade/">RU</a></div>
+      <div class="lang-switch"><a aria-label="English" href="/amneziawg-installer/cascade/">EN</a> <a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/cascade/">RU</a></div>
     </div>
   </div>
 </footer>

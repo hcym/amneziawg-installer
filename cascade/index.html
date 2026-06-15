@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Two-server cascade VPN: Russian traffic direct, the rest abroad</title>
-<meta name="description" content="A two-server cascade (double VPN) on AmneziaWG: clients connect to an entry server, Russian traffic exits directly from a Russian IP, everything else goes through a foreign exit server. Split routing on the server, built on amneziawg-installer.">
+<title>Two-server cascade VPN: Russian traffic direct, rest abroad</title>
+<meta name="description" content="A two-server cascade (double VPN) on AmneziaWG: Russian traffic exits directly from a Russian IP, everything else goes through a foreign exit server. Split on the server.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/cascade/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/cascade/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
@@ -14,14 +14,14 @@
 <meta property="og:description" content="A double-VPN cascade on AmneziaWG with server-side split routing: Russian traffic direct, everything else through a foreign exit.">
 <meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/cascade/">
 <meta property="og:site_name" content="amneziawg-installer">
-<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-cascade.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="amneziawg-installer - AmneziaWG 2.0 VPN server in one command">
+<meta property="og:image:alt" content="Two-server AmneziaWG cascade: Russian traffic direct, the rest abroad">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="ru_RU">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-cascade.png">
 <meta name="twitter:title" content="Two-server cascade VPN: Russian traffic direct, the rest abroad">
 <meta name="twitter:description" content="A double-VPN cascade on AmneziaWG with server-side split routing.">
 <meta name="theme-color" content="#0e1116">
@@ -52,8 +52,25 @@
   ]
 }
 </script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Two-server cascade VPN: Russian traffic direct, the rest abroad",
+  "description": "A two-server cascade (double VPN) on AmneziaWG with server-side split routing: Russian traffic exits directly from a Russian IP, everything else goes through a foreign exit server.",
+  "inLanguage": "en",
+  "image": "https://bivlked.github.io/amneziawg-installer/assets/og-cascade.png",
+  "datePublished": "2026-06-15",
+  "dateModified": "2026-06-15",
+  "author": { "@type": "Person", "name": "bivlked" },
+  "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
+  "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/cascade/",
+  "isPartOf": "https://bivlked.github.io/amneziawg-installer/"
+}
+</script>
 </head>
 <body>
+<a class="skip-link" href="#main">Skip to content</a>
 
 <header class="site-header">
   <div class="wrap">
@@ -62,13 +79,13 @@
       amneziawg-installer
     </a>
     <nav class="nav-right" aria-label="Site navigation">
-      <span class="lang-switch"><a class="active" aria-current="page" href="/amneziawg-installer/cascade/">EN</a><a href="/amneziawg-installer/ru/cascade/">RU</a></span>
+      <span class="lang-switch"><a class="active" aria-current="page" aria-label="English" href="/amneziawg-installer/cascade/">EN</a><a aria-label="Русский" href="/amneziawg-installer/ru/cascade/">RU</a></span>
       <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Star on GitHub</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
 <section class="hero">
   <div class="wrap">
@@ -85,6 +102,34 @@
   <div class="wrap">
     <h2>How it works</h2>
     <p class="sub">One client connection, two servers, traffic split by destination.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Traffic flow diagram: the client makes one connection to the entry server in Russia; Russian networks are sent out directly and seen from a Russian IP, while everything else is routed through a foreign exit server and seen from a foreign IP." font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+        <defs><marker id="cad" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
+        <rect x="24" y="150" width="150" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <text x="99" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Client</text>
+        <text x="99" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">one connection</text>
+        <line x1="176" y1="183" x2="232" y2="183" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <rect x="236" y="138" width="186" height="92" rx="12" fill="#10261c" stroke="#2bbd80"/>
+        <g transform="translate(248 150) scale(0.7)"><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#3ddc97"/></g>
+        <text x="342" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Entry server</text>
+        <text x="342" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">in Russia, holds the split</text>
+        <path d="M422 166 C 502 122, 542 98, 612 92" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <text x="516" y="110" text-anchor="middle" font-size="12" fill="#9aa7b4">RU networks, direct</text>
+        <rect x="616" y="58" width="180" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <text x="706" y="86" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Russian sites</text>
+        <text x="706" y="105" text-anchor="middle" font-size="12" fill="#9aa7b4">seen from a Russian IP</text>
+        <path d="M404 230 C 422 270, 442 287, 484 293" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <text x="432" y="268" text-anchor="middle" font-size="12" fill="#9aa7b4">everything else</text>
+        <rect x="488" y="262" width="160" height="78" rx="12" fill="#10261c" stroke="#2bbd80"/>
+        <text x="568" y="296" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Exit server</text>
+        <text x="568" y="315" text-anchor="middle" font-size="12" fill="#9aa7b4">abroad</text>
+        <line x1="650" y1="301" x2="694" y2="301" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
+        <rect x="698" y="268" width="118" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <text x="757" y="296" text-anchor="middle" font-size="13.5" font-weight="600" fill="#e6edf3">Foreign</text>
+        <text x="757" y="314" text-anchor="middle" font-size="12" fill="#9aa7b4">clean exit IP</text>
+      </svg>
+      <figcaption>One client connection. The entry server sends Russian traffic out directly and routes the rest through a foreign exit.</figcaption>
+    </figure>
     <div class="grid">
       <div class="card">
         <div class="ico" aria-hidden="true">&#128272;</div>
@@ -141,6 +186,26 @@
   </div>
 </section>
 
+<section id="related" class="related">
+  <div class="wrap">
+    <h2>See also</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9878;&#65039;</div>
+        <h3>vs the official Amnezia app</h3>
+        <p>Same AmneziaWG 2.0 protocol, different delivery: no Docker, the whole server tuned and hardened, fine control over the obfuscation.</p>
+        <a class="go" href="/amneziawg-installer/compare/">How it differs &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128640;</div>
+        <h3>Get started</h3>
+        <p>Each server in the cascade is a normal install. One command turns a clean VPS into a working AmneziaWG 2.0 server.</p>
+        <a class="go" href="/amneziawg-installer/#quick-start">Quick start &#8594;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 </main>
 
 <footer class="site-footer">
@@ -150,12 +215,14 @@
         <div class="foot-links">
           <a href="/amneziawg-installer/">Home</a>
           <a href="https://github.com/bivlked/amneziawg-installer">Repository</a>
-          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.en.md">Cascade guide</a>
           <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Install guide</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.en.md">Advanced</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CHANGELOG.en.md">Changelog</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.en.md">Cascade guide</a>
         </div>
         <p class="note">Open source under the MIT license. If the project helped you, a star on GitHub helps others find it.</p>
       </div>
-      <div class="lang-switch"><a class="active" aria-current="page" href="/amneziawg-installer/cascade/">EN</a> <a href="/amneziawg-installer/ru/cascade/">RU</a></div>
+      <div class="lang-switch"><a class="active" aria-current="page" aria-label="English" href="/amneziawg-installer/cascade/">EN</a> <a aria-label="Русский" href="/amneziawg-installer/ru/cascade/">RU</a></div>
     </div>
   </div>
 </footer>
