@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How amneziawg-installer differs from the official Amnezia app</title>
+<meta name="description" content="What amneziawg-installer does differently from the official Amnezia VPN app: the same AmneziaWG 2.0 protocol with no Docker overhead, the whole server tuned and hardened, and fine control over the obfuscation.">
+<link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/compare/">
+<link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/compare/">
+<link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/compare/">
+<link rel="alternate" hreflang="x-default" href="https://bivlked.github.io/amneziawg-installer/compare/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How amneziawg-installer differs from the official Amnezia app">
+<meta property="og:description" content="The same AmneziaWG 2.0 protocol with no Docker overhead, the whole server tuned and hardened, and fine control over the obfuscation.">
+<meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/compare/">
+<meta property="og:site_name" content="amneziawg-installer">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="amneziawg-installer - AmneziaWG 2.0 VPN server in one command">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta name="twitter:title" content="How amneziawg-installer differs from the official Amnezia app">
+<meta name="twitter:description" content="The same AmneziaWG 2.0 protocol with no Docker overhead, a fully tuned and hardened server.">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "How does amneziawg-installer differ from the official Amnezia app?", "acceptedAnswer": { "@type": "Answer", "text": "Both run the same AmneziaWG 2.0 protocol. The official app is a GUI that deploys the server side in Docker over SSH. This installer skips Docker and runs AmneziaWG as a kernel module, then tunes and hardens the whole server for a single-purpose VPN - lower overhead, a smaller attack surface, and fine control over the obfuscation." } },
+    { "@type": "Question", "name": "Does it use Docker on the server?", "acceptedAnswer": { "@type": "Answer", "text": "No. It installs AmneziaWG as a kernel module through DKMS, so there is no Docker daemon or container stack running in the background. That keeps RAM and CPU use low, which matters most on a cheap VPS but helps on any server." } },
+    { "@type": "Question", "name": "Does it optimize the server itself?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The script reads the server's RAM and network card, then tunes sysctl buffers, swap size, and NIC offloads and enables BBR. It also strips unneeded packages and services so the box does one job. The container-based official app deploys its containers and does not do this kind of host-wide tuning and hardening." } },
+    { "@type": "Question", "name": "Can I tune the obfuscation for my carrier or network?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. There is a mobile-network preset, direct access to the AmneziaWG 2.0 parameters, and field data on DPI behaviour, so you can tune the obfuscation for a specific operator or network." } },
+    { "@type": "Question", "name": "Is the protocol and security the same?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. It is the same AmneziaWG 2.0 underneath, so the DPI-resistant obfuscation is identical. The installer is open source under the MIT license, it is readable bash you can review before running, and it has more than 800 automated tests. It installs the same upstream AmneziaWG - automation and server tuning, not a fork of the protocol." } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "amneziawg-installer", "item": "https://bivlked.github.io/amneziawg-installer/" },
+    { "@type": "ListItem", "position": 2, "name": "How it differs from the official Amnezia app", "item": "https://bivlked.github.io/amneziawg-installer/compare/" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/amneziawg-installer/">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3ddc97"/><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/></svg>
+      amneziawg-installer
+    </a>
+    <nav class="nav-right" aria-label="Site navigation">
+      <span class="lang-switch"><a class="active" aria-current="page" href="/amneziawg-installer/compare/">EN</a><a href="/amneziawg-installer/ru/compare/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Star on GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero">
+  <div class="wrap">
+    <h1>How this installer differs from the official Amnezia app</h1>
+    <p class="lede">Both set up the same AmneziaWG 2.0 protocol. The official app is a graphical client that deploys the server in Docker. This installer is built for one goal: to get the most out of a single dedicated VPS as a VPN server. Here is what that changes.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#different">What it does differently</a>
+      <a class="btn" href="/amneziawg-installer/#quick-start">Quick start</a>
+    </div>
+  </div>
+</section>
+
+<section id="approaches">
+  <div class="wrap">
+    <h2>Two approaches to the same protocol</h2>
+    <p class="sub">AmneziaWG 2.0 underneath either way. The difference is how the server is delivered and how far it is tuned.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>Official Amnezia app</h3>
+        <p>A graphical client for desktop and phone. You point it at a server and it deploys the server side in Docker over SSH, then manages clients from the app. A convenient official path when a GUI is all you need, and it does not take on host-wide tuning or hardening.</p>
+      </div>
+      <div class="card">
+        <h3>amneziawg-installer</h3>
+        <p>One SSH command that turns a dedicated VPS into a tuned VPN box. AmneziaWG runs as a kernel module, the whole server is optimized and hardened for the one job, and clients are managed from the command line. No Docker, nothing extra running in the background.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="different">
+  <div class="wrap">
+    <h2>What this installer does differently</h2>
+    <p class="sub">Everything here follows from one idea: a lean, fully tuned, single-purpose VPN box you control end to end.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128230;</div>
+        <h3>No Docker overhead</h3>
+        <p>AmneziaWG runs as a kernel module, not inside a container, so there is no Docker daemon in the background. RAM and CPU stay free for the tunnel - critical on a cheap VPS and welcome on a bigger one.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9889;</div>
+        <h3>The server is tuned to the hardware</h3>
+        <p>The script detects RAM, CPU, and the network card, then sets sysctl buffers, swap size, and NIC offloads and enables BBR. It wrings the most out of the plan you pay for, rather than treating host-wide tuning as out of scope.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128737;</div>
+        <h3>Smaller attack surface</h3>
+        <p>Unneeded packages and services are stripped, so the box does one thing. On top of that: UFW deny-all, Fail2Ban, strict file permissions, and sysctl hardening. One service to keep an eye on, not a stack.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128225;</div>
+        <h3>Fine control over the obfuscation</h3>
+        <p>A mobile-network preset (--preset=mobile), direct access to the AmneziaWG 2.0 parameters, and field data on carriers and DPI. When an operator or network is awkward, you can tune the obfuscation for it rather than hope a default fits.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128295;</div>
+        <h3>Headless and scriptable</h3>
+        <p>One SSH command, every option as a flag, no desktop app required. CLI client management, time-limited guest configs, QR and vpn link import, and JSON output for automation.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128421;</div>
+        <h3>ARM prebuilts</h3>
+        <p>Prebuilt kernel modules for Raspberry Pi, Oracle Ampere, Hetzner CAX, and AWS Graviton, with a DKMS build as fallback. The same command picks the right one.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="trust">
+  <div class="wrap">
+    <h2>Same protocol, same obfuscation</h2>
+    <p class="sub">The differences are in delivery and tuning, not in how well it resists DPI.</p>
+    <p>It is the same AmneziaWG 2.0 underneath, so the obfuscation designed to resist deep packet inspection is identical. The installer is open source under the MIT license, it is readable bash you can review before running, and it carries more than 800 automated tests. It installs the same upstream AmneziaWG - this is automation and server tuning, not a fork of the protocol.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/amneziawg-installer/#quick-start">Quick start</a>
+      <a class="btn" href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Full guide</a>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>FAQ</h2>
+    <div class="faq">
+      <details><summary>How does it differ from the official Amnezia app?</summary><div class="answer">Both run the same AmneziaWG 2.0 protocol. The official app is a GUI that deploys the server side in Docker over SSH. This installer skips Docker and runs AmneziaWG as a kernel module, then tunes and hardens the whole server for a single-purpose VPN - lower overhead, a smaller attack surface, and fine control over the obfuscation.</div></details>
+      <details><summary>Does it use Docker on the server?</summary><div class="answer">No. It installs AmneziaWG as a kernel module through DKMS, so there is no Docker daemon or container stack running in the background. That keeps RAM and CPU use low, which matters most on a cheap VPS but helps on any server.</div></details>
+      <details><summary>Does it optimize the server itself?</summary><div class="answer">Yes. The script reads the server's RAM and network card, then tunes sysctl buffers, swap size, and NIC offloads and enables BBR. It also strips unneeded packages so the box does one job. The container-based official app deploys its containers and does not do this kind of host-wide tuning and hardening.</div></details>
+      <details><summary>Can I tune the obfuscation for my carrier or network?</summary><div class="answer">Yes. There is a mobile-network preset, direct access to the AmneziaWG 2.0 parameters, and field data on DPI behaviour, so you can tune the obfuscation for a specific operator or network.</div></details>
+      <details><summary>Is the protocol and security the same?</summary><div class="answer">Yes. It is the same AmneziaWG 2.0 underneath, so the DPI-resistant obfuscation is identical. The installer is open source under the MIT license, readable bash you can review before running, with more than 800 automated tests. It installs the same upstream AmneziaWG - automation and server tuning, not a fork of the protocol.</div></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="foot-links">
+          <a href="/amneziawg-installer/">Home</a>
+          <a href="https://github.com/bivlked/amneziawg-installer">Repository</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Install guide</a>
+          <a href="https://github.com/bivlked/amneziawg-installer#similar-tools">All similar tools</a>
+        </div>
+        <p class="note">Open source under the MIT license. If the project helped you, a star on GitHub helps others find it.</p>
+      </div>
+      <div class="lang-switch"><a class="active" aria-current="page" href="/amneziawg-installer/compare/">EN</a> <a href="/amneziawg-installer/ru/compare/">RU</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
