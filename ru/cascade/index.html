@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Каскад из двух серверов: российский трафик напрямую, остальное за границу</title>
+<meta name="description" content="Каскад из двух серверов (двойной VPN) на AmneziaWG: клиент подключается к серверу-входу, российский трафик уходит напрямую с российского IP, остальное - через зарубежный сервер-выход. Раздельная маршрутизация на сервере, на базе amneziawg-installer.">
+<link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
+<link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/cascade/">
+<link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
+<link rel="alternate" hreflang="x-default" href="https://bivlked.github.io/amneziawg-installer/cascade/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Каскад из двух серверов: российский трафик напрямую, остальное за границу">
+<meta property="og:description" content="Каскад (двойной VPN) на AmneziaWG с раздельной маршрутизацией на сервере: российский трафик напрямую, остальное через зарубежный выход.">
+<meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
+<meta property="og:site_name" content="amneziawg-installer">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="amneziawg-installer - сервер AmneziaWG 2.0 одной командой">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
+<meta name="twitter:title" content="Каскад из двух серверов: российский трафик напрямую, остальное за границу">
+<meta name="twitter:description" content="Каскад (двойной VPN) на AmneziaWG с раздельной маршрутизацией на сервере.">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../../assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Что такое каскад из двух серверов?", "acceptedAnswer": { "@type": "Answer", "text": "Это два сервера, соединённые в цепочку (иногда называют двойным VPN). Клиент подключается к серверу-входу, а тот пересылает часть трафика через второй сервер-выход. Здесь деление идёт по месту назначения: российские сети уходят напрямую с сервера-входа, остальное - через зарубежный выход." } },
+    { "@type": "Question", "name": "Зачем отделять российский трафик от остального?", "acceptedAnswer": { "@type": "Answer", "text": "Чтобы российские сайты открывались с российского IP без крюка через заграницу и без отказа иностранным адресам, а зарубежные сайты шли через чистый зарубежный выход. И то и другое - с одного подключения на клиенте." } },
+    { "@type": "Question", "name": "Нужна ли особая настройка на клиенте?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Деление целиком на сервере-входе. Клиенты добавляются как обычно и не требуют особой настройки - они просто подключаются к серверу-входу." } },
+    { "@type": "Question", "name": "Каскад входит в установщик?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Каскад из нескольких серверов - это отдельная ручная настройка поверх двух обычных установок amneziawg-installer. Есть пошаговая инструкция с проверенным скриптом маршрутизации и systemd-юнитом для автозапуска после перезагрузки." } },
+    { "@type": "Question", "name": "Откуда берётся список российских сетей?", "acceptedAnswer": { "@type": "Answer", "text": "Из агрегированной зоны российских IP (ipdeny), загружается в ipset. Трафик к этим сетям идёт напрямую, остальное помечается и уходит через зарубежный выход. Список периодически обновляется." } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "amneziawg-installer", "item": "https://bivlked.github.io/amneziawg-installer/ru/" },
+    { "@type": "ListItem", "position": 2, "name": "Каскад из двух серверов с раздельной маршрутизацией", "item": "https://bivlked.github.io/amneziawg-installer/ru/cascade/" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/amneziawg-installer/ru/">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3ddc97"/><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/></svg>
+      amneziawg-installer
+    </a>
+    <nav class="nav-right" aria-label="Навигация по сайту">
+      <span class="lang-switch"><a href="/amneziawg-installer/cascade/">EN</a><a class="active" aria-current="page" href="/amneziawg-installer/ru/cascade/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Star на GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero">
+  <div class="wrap">
+    <h1>Каскад из двух серверов: российский трафик напрямую, остальное за границу</h1>
+    <p class="lede">Каскад (двойной VPN) связывает два сервера AmneziaWG в цепочку. Клиент подключается к серверу-входу; российский трафик уходит напрямую с него, а остальное - через второй сервер за границей. Деление на стороне сервера, на клиенте ничего особого настраивать не нужно.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.md">Полная пошаговая инструкция</a>
+      <a class="btn" href="#how">Как это работает</a>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>Как это работает</h2>
+    <p class="sub">Одно подключение клиента, два сервера, трафик делится по месту назначения.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128272;</div>
+        <h3>Сервер-вход (в России)</h3>
+        <p>Сюда подключаются клиенты. Этот сервер решает, куда направить каждый поток, и держит всю логику каскада. Российские сайты идут напрямую с его IP, поэтому открываются быстро и принимают подключение.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#127758;</div>
+        <h3>Сервер-выход (за границей)</h3>
+        <p>Обычный сервер AmneziaWG за границей. Сервер-вход подключается к нему как клиент и пересылает всё, что не относится к российским сетям, - зарубежные сайты видят чистый зарубежный IP.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#129517;</div>
+        <h3>Деление по назначению</h3>
+        <p>Список российских сетей загружается в ipset. Трафик к этим адресам идёт напрямую, остальной помечается и уходит через выход. Без правил под каждое приложение и без списков на клиенте.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Когда это полезно</h2>
+    <p class="sub">Обычный VPN гонит весь трафик через один выход. Каскад даёт сразу два.</p>
+    <p>Нужен одновременно быстрый доступ к российским ресурсам с российского адреса и зарубежный выход для всего остального - с одного подключения на клиенте. Российские сайты, которые не пускают иностранные IP, продолжают работать, зарубежные получают чистый выход, а всё решение принимается на сервере, одинаково для всех клиентов. Если хватает обычной установки на один сервер или раздельную маршрутизацию проще задать на клиенте - это не нужно. Каскад - для случая, когда деление должно жить на сервере.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.md">Полная пошаговая инструкция</a>
+      <a class="btn" href="/amneziawg-installer/ru/#quick-start">Поставить базовый сервер</a>
+    </div>
+  </div>
+</section>
+
+<section id="trust">
+  <div class="wrap">
+    <h2>На проверенной основе</h2>
+    <p class="sub">Инструкция не набросок - маршрутизацию проверили вживую.</p>
+    <p>Каскад работает поверх двух обычных установок amneziawg-installer. В инструкции - идемпотентный скрипт маршрутизации и systemd-юнит, чтобы деление само поднималось после перезагрузки. Всё проверено на живом стенде из двух серверов: и сам сплит, и повторные запуски, и восстановление после ребута. Схему предложил в community-разборе @glfenix, полностью задокументирована в репозитории.</p>
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/bivlked/amneziawg-installer/discussions/120">Обсуждение #120</a>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Частые вопросы</h2>
+    <div class="faq">
+      <details><summary>Что такое каскад из двух серверов?</summary><div class="answer">Это два сервера, соединённые в цепочку (иногда называют двойным VPN). Клиент подключается к серверу-входу, а тот пересылает часть трафика через второй сервер-выход. Здесь деление идёт по месту назначения: российские сети уходят напрямую с сервера-входа, остальное - через зарубежный выход.</div></details>
+      <details><summary>Зачем отделять российский трафик от остального?</summary><div class="answer">Чтобы российские сайты открывались с российского IP без крюка через заграницу и без отказа иностранным адресам, а зарубежные сайты шли через чистый зарубежный выход. И то и другое - с одного подключения на клиенте.</div></details>
+      <details><summary>Нужна ли особая настройка на клиенте?</summary><div class="answer">Нет. Деление целиком на сервере-входе. Клиенты добавляются как обычно и не требуют особой настройки - они просто подключаются к серверу-входу.</div></details>
+      <details><summary>Каскад входит в установщик?</summary><div class="answer">Нет. Каскад из нескольких серверов - это отдельная ручная настройка поверх двух обычных установок amneziawg-installer. Есть пошаговая инструкция с проверенным скриптом маршрутизации и systemd-юнитом для автозапуска после перезагрузки.</div></details>
+      <details><summary>Откуда берётся список российских сетей?</summary><div class="answer">Из агрегированной зоны российских IP (ipdeny), загружается в ipset. Трафик к этим сетям идёт напрямую, остальное помечается и уходит через зарубежный выход. Список периодически обновляется.</div></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="foot-links">
+          <a href="/amneziawg-installer/ru/">Главная</a>
+          <a href="https://github.com/bivlked/amneziawg-installer">Репозиторий</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.md">Гайд по каскаду</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Гайд по установке</a>
+        </div>
+        <p class="note">Открытый код под лицензией MIT. Если проект помог - звезда на GitHub помогает другим его найти.</p>
+      </div>
+      <div class="lang-switch"><a href="/amneziawg-installer/cascade/">EN</a> <a class="active" aria-current="page" href="/amneziawg-installer/ru/cascade/">RU</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
